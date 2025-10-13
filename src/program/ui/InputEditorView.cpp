@@ -823,7 +823,9 @@ void InputEditorView::insertInputs()
     int nbFrames = QInputDialog::getInt(this, tr("Insert frames"), tr("Number of frames to insert: "), 1, 0, 100000, 1, &ok);
 
     if (ok) {
-        inputEditorModel->insertRows(indexes[0].row(), nbFrames, false);
+        int insertRow = indexes[0].row();
+        inputEditorModel->insertRows(insertRow, nbFrames, false);
+        inputEditorModel->shiftMarkers(insertRow, nbFrames);
     }
 }
 
@@ -903,8 +905,11 @@ void InputEditorView::deleteInput()
         return;
 
     /* Removing rows must be done in reversed order so that row indices are valid */
-    int min_row = applyToSelectedRangesReversed([this](int min, int max){inputEditorModel->removeRows(min, max-min+1);});
-    
+    int min_row = applyToSelectedRangesReversed([this](int min, int max){
+        inputEditorModel->removeMarkersInRange(min, max);
+        inputEditorModel->removeRows(min, max - min + 1);
+    });
+
     /* Select the next frame */
     QModelIndex newSel = inputEditorModel->index(min_row, 0);
     selectionModel()->clear();
