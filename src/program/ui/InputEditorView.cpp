@@ -806,6 +806,7 @@ void InputEditorView::duplicateInput()
 
     /* FIXME: Discontinuous selection is not handled */
     inputEditorModel->insertRows(indexes[0].row(), indexes.count(), true);
+    inputEditorModel->shiftMarkers(indexes[0].row(), indexes.count());
 }
 
 void InputEditorView::insertInput()
@@ -817,6 +818,7 @@ void InputEditorView::insertInput()
         return;
 
     inputEditorModel->insertRows(indexes[0].row(), 1, false);
+    inputEditorModel->shiftMarkers(indexes[0].row(), 1);
 }
 
 void InputEditorView::insertInputs()
