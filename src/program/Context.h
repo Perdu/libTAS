@@ -146,6 +146,9 @@ struct Context {
 
     /* Link to the movie */
     MovieFile* movie;
+    
+    /* Detected game engine */
+    int engine;
 };
 
 #endif
