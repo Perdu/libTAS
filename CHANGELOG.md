@@ -2,11 +2,13 @@
 ### Added
 
 * Debug window for file descriptors
+* File Debug OSD shows all files with types
 
 ### Changed
 ### Fixed
 
-* Savestates now restore better file descriptors 
+* Savestates now restore better file descriptors
+* Fix SDL getting window dimensions of zero
 
 ## [1.4.7] - 2025-10-06
 ### Added

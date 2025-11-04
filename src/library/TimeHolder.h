@@ -48,6 +48,11 @@ class TimeHolder : public timespec
             return this->tv_sec == 0 && this->tv_nsec == 0;
         }
 
+        bool operator==(const timespec& th) const
+        {
+            return ((this->tv_sec == th.tv_sec) && (this->tv_nsec == th.tv_nsec));
+        }
+
         bool operator!=(const timespec& th) const
         {
             return ((this->tv_sec != th.tv_sec) || (this->tv_nsec != th.tv_nsec));
@@ -108,6 +113,8 @@ class TimeHolder : public timespec
             return ((this->tv_sec < th.tv_sec) || ((this->tv_sec == th.tv_sec) && (this->tv_nsec < th.tv_nsec)));
         }
 
+        static TimeHolder now();
+
         /* Use a shift and add algorithm for multiplying a TimeHolder
          * by an integer, so that we should never overflow the tv_nsec value
          */
@@ -115,7 +122,12 @@ class TimeHolder : public timespec
 
         /* Bring the tv_nsec value inside the range [0,999999999] */
         void normalize();
+        
+        float toMs() const;
 };
+
+static TimeHolder nullTime = {-1, -1};
+
 }
 
 #endif

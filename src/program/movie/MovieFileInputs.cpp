@@ -70,8 +70,8 @@ void MovieFileInputs::clear()
     modifiedSinceLastStateLoad = false;
     emit inputsToBeReset();
     input_list.clear();
-    emit inputsReset();
     movie_changelog->clear();
+    emit inputsReset();
 }
 
 void MovieFileInputs::load()
@@ -237,8 +237,8 @@ void MovieFileInputs::copyFrom(const MovieFileInputs* movie_inputs)
     emit inputsToBeReset();
     input_list.resize(movie_inputs->input_list.size());
     std::copy(movie_inputs->input_list.begin(), movie_inputs->input_list.end(), input_list.begin());
-    emit inputsReset();
     movie_changelog->clear();
+    emit inputsReset();
 }
 
 void MovieFileInputs::close()
@@ -263,7 +263,11 @@ void MovieFileInputs::wasModified()
     modifiedSinceLastSave = true;
     modifiedSinceLastAutoSave = true;
     modifiedSinceLastStateLoad = true;
-    updateLength();
+
+    /* We don't need to update movie length and send it to the game when not recording.
+     * This can save a bit of time during fast-forward. */
+    if (context->config.sc.recording != SharedConfig::NO_RECORDING)
+        updateLength();
 }
 
 void MovieFileInputs::processPendingActions()

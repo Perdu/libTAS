@@ -22,6 +22,7 @@
 #include "frame.h"
 #include "GlobalState.h"
 #include "global.h"
+#include "GameHacks.h"
 #include "hookpatch.h"
 #ifdef __unix__
 #include "checkpoint/ProcSelfMaps.h"
@@ -31,14 +32,17 @@
 #include "checkpoint/MemArea.h"
 #include "checkpoint/ThreadManager.h"
 #include "checkpoint/ThreadInfo.h"
+#include "renderhud/UnityDebug.h"
 #include "../shared/unity_funcs.h"
 
 #include <unistd.h>
 #include <memory>
 #include <vector>
 #include <map>
+#include <mutex>
 #include <condition_variable>
 #include <sys/mman.h> // PROT_READ, PROT_WRITE, etc.
+#include <atomic>
 
 namespace libtas {
 
@@ -57,7 +61,7 @@ bool UnityHacks::isUnity()
     return unity;
 }
 
-
+typedef void UnityVersion;
 class JobQueue;
 class BackgroundJobQueue;
 typedef int JobQueue_JobQueuePriority;
@@ -79,13 +83,123 @@ typedef void* (*JobsCallbackFunctions)(void*, int);
 typedef void ScriptingBackendNativeObjectPtrOpaque;
 class JobScheduleParameters;
 class JobFence;
+typedef uint8_t PreloadManager;
+typedef long PreloadManager_UpdatePreloadingFlags;
+
+typedef void AsyncReadManagerThreaded;
+typedef uint8_t AsyncReadCommand;
+typedef int AsyncReadCommand_Status;
+typedef long VFS_FileSize;
+typedef void AsyncUploadManager;
+typedef int AsyncUploadHandler;
+typedef void AssetContext;
+typedef long FileReadFlags;
+typedef void GfxDevice;
+typedef void AsyncUploadManagerSettings;
+
+typedef void ArchiveStorageConverter;
+typedef void IArchiveStorageConverterListener;
+typedef void AssetBundleLoadFromStreamAsyncOperation;
+
+typedef void SoundHandle_Instance;
+typedef void SampleClip;
+typedef void FMOD_CREATESOUNDEXINFO;
+
+struct Int128 {
+    long a;
+    long b;
+};
 
 struct JobGroupID {
     JobGroup* group;
     int tag;
 };
 
+typedef uint8_t PreloadManagerOperation;
+
+class U4_PreloadManagerOperation
+{
+public:
+    virtual ~U4_PreloadManagerOperation();
+    virtual bool IsDone(PreloadManagerOperation* po);
+    virtual float GetProgress(PreloadManagerOperation* po);
+    virtual long GetPriority(PreloadManagerOperation* po);
+    virtual void SetPriority(PreloadManagerOperation* po, int p);
+    virtual bool GetAllowSceneActivation(PreloadManagerOperation* po);
+    virtual void SetAllowSceneActivation(PreloadManagerOperation* po, bool sa);
+    virtual void Perform(PreloadManagerOperation* po);
+    virtual void IntegrateMainThread(PreloadManagerOperation* po);
+    virtual void HasIntegrateMainThread(PreloadManagerOperation* po);
+    virtual bool MustCompleteNextFrame(PreloadManagerOperation* po);
+    virtual char* GetDebugName(PreloadManagerOperation* po);
+};
+
+class U5_PreloadManagerOperation
+{
+public:
+    virtual ~U5_PreloadManagerOperation();
+    virtual bool IsDone(PreloadManagerOperation* po);
+    virtual float GetProgress(PreloadManagerOperation* po);
+    virtual long GetPriority(PreloadManagerOperation* po);
+    virtual void SetPriority(PreloadManagerOperation* po, int p);
+    virtual bool GetAllowSceneActivation(PreloadManagerOperation* po);
+    virtual void SetAllowSceneActivation(PreloadManagerOperation* po, bool sa);
+    virtual void Release(PreloadManagerOperation* po);
+    virtual void Perform(PreloadManagerOperation* po);
+    virtual void IntegrateTimeSliced(PreloadManagerOperation* po, int i);
+    virtual void IntegrateMainThread(PreloadManagerOperation* po);
+    virtual bool MustCompleteNextFrame(PreloadManagerOperation* po);
+    virtual bool GetAllowParallelExecution(PreloadManagerOperation* po);
+    virtual char* GetDebugName(PreloadManagerOperation* po);
+};
+
+class U2018_PreloadManagerOperation
+{
+public:
+    virtual ~U2018_PreloadManagerOperation();
+    virtual bool IsDone(PreloadManagerOperation* po);
+    virtual float GetProgress(PreloadManagerOperation* po);
+    virtual long GetPriority(PreloadManagerOperation* po);
+    virtual void SetPriority(PreloadManagerOperation* po, int p);
+    virtual bool GetAllowSceneActivation(PreloadManagerOperation* po);
+    virtual void SetAllowSceneActivation(PreloadManagerOperation* po, bool sa);
+    virtual void InvokeCoroutine(PreloadManagerOperation* po);
+    virtual void SetFinalTiming(PreloadManagerOperation* po, float a, float b, float c, float d);
+    virtual void Perform(PreloadManagerOperation* po);
+    virtual void IntegrateTimeSliced(PreloadManagerOperation* po, int i);
+    virtual void IntegrateMainThread(PreloadManagerOperation* po);
+    virtual bool MustCompleteNextFrame(PreloadManagerOperation* po);
+    virtual bool GetAllowParallelExecution(PreloadManagerOperation* po);
+    virtual char* GetDebugName(PreloadManagerOperation* po);
+};
+
+class U6_PreloadManagerOperation
+{
+public:
+    virtual long ExceptionToPropagateToAwaiter();
+    virtual ~U6_PreloadManagerOperation();
+    virtual bool IsDone(PreloadManagerOperation* po);
+    virtual float GetProgress(PreloadManagerOperation* po);
+    virtual long GetPriority(PreloadManagerOperation* po);
+    virtual void SetPriority(PreloadManagerOperation* po, int p);
+    virtual bool GetAllowSceneActivation(PreloadManagerOperation* po);
+    virtual void SetAllowSceneActivation(PreloadManagerOperation* po, bool sa);
+    virtual void InvokeCoroutine(PreloadManagerOperation* po);
+    virtual long Cancel(PreloadManagerOperation* po);
+    virtual void SetFinalTiming(PreloadManagerOperation* po, float a, float b, float c, float d);
+    virtual void Perform(PreloadManagerOperation* po);
+    virtual void IntegrateTimeSliced(PreloadManagerOperation* po, int i);
+    virtual void IntegrateMainThread(PreloadManagerOperation* po);
+    virtual bool MustCompleteNextFrame(PreloadManagerOperation* po);
+    virtual bool CanLoadObjects(PreloadManagerOperation* po);
+    virtual bool CanPerformWhileObjectsLoading(PreloadManagerOperation* po);
+    virtual bool GetAllowParallelExecution(PreloadManagerOperation* po);
+    virtual char* GetDebugName(PreloadManagerOperation* po);
+};
+
 namespace orig {
+    void (*UnityVersion_UnityVersion)(UnityVersion* u, const char* s) = nullptr;
+
     void (*U4_JobScheduler_AwakeIdleWorkerThreads)(JobScheduler* t, int x) = nullptr;
     long (*U4_JobScheduler_FetchNextJob)(JobScheduler* t, int* x) = nullptr;
     void (*U4_JobScheduler_ProcessJob)(JobScheduler* t, JobInfo* x, int y) = nullptr;
@@ -129,12 +243,84 @@ namespace orig {
     void (*U6_ujob_execute_job)(ujob_control_t*, ujob_lane_t*, ujob_job_t*, ujob_handle_t, unsigned int) = nullptr;
     void (*U6_ujob_participate)(ujob_control_t* x, ujob_handle_t y, ujob_job_t* z, int* a, ujob_dependency_chain const* b) = nullptr;
     unsigned long (*U6_ujob_schedule_job_internal)(ujob_control_t* x, ujob_handle_t y, unsigned int z) = nullptr;
-    long (*U6_ujob_schedule_parallel_for_internal)(ujob_control_t* x, JobsCallbackFunctions* y, void* z, WorkStealingRange* a, unsigned int b, unsigned long c, ujob_handle_t const* d, long e) = nullptr;
+    ujob_handle_t (*U6_ujob_schedule_parallel_for_internal)(ujob_control_t* x, JobsCallbackFunctions* y, void* z, WorkStealingRange* a, unsigned int b, unsigned long c, ujob_handle_t const* d, long e) = nullptr;
+    void (*U6_ujob_wait_for)(ujob_control_t *x, ujob_handle_t y, int z) = nullptr;
     void (*U6_ujobs_add_to_lane_and_wake_one_thread)(ujob_control_t*, ujob_job_t*, ujob_lane_t*) = nullptr;
     void (*U6_worker_thread_routine)(void* x) = nullptr;
+
+    void (*U6_PreloadManager_AddToQueue)(PreloadManager* m, PreloadManagerOperation* o) = nullptr;
+    PreloadManagerOperation* (*U6_PreloadManager_PrepareProcessingPreloadOperation)(PreloadManager* m) = nullptr;
+    void (*U6_PreloadManager_ProcessSingleOperation)(PreloadManager* m) = nullptr;
+    void (*U6_PreloadManager_UpdatePreloading)(PreloadManager* m) = nullptr;
+    long (*U4_PreloadManager_UpdatePreloadingSingleStep)(PreloadManager* m, bool i) = nullptr;
+    long (*U6_PreloadManager_UpdatePreloadingSingleStep)(PreloadManager* m, PreloadManager_UpdatePreloadingFlags f, int i) = nullptr;
+    void (*U6_PreloadManager_WaitForAllAsyncOperationsToComplete)(PreloadManager* m) = nullptr;
+    long (*U6_PreloadManager_Run)(void* p) = nullptr;
+    PreloadManagerOperation* (*U2K_PreloadManager_PeekIntegrateQueue)(PreloadManager* m) = nullptr;
+    bool (*U2K_PreloadManager_IsLoadingOrQueued)(PreloadManager* m) = nullptr;
+
+    void (*U5_AsyncReadManagerThreaded_WaitDone)(AsyncReadManagerThreaded *t, AsyncReadCommand *c) = nullptr;
+    void (*U6_AsyncReadManagerThreaded_Request)(AsyncReadManagerThreaded *t, AsyncReadCommand *c) = nullptr;
+    void (*U2K_AsyncReadManagerThreaded_SyncRequest)(AsyncReadManagerThreaded *t, AsyncReadCommand *c) = nullptr;
+    void (*U6_AsyncReadManagerManaged_OpenCompleteCallback)(AsyncReadCommand *c, AsyncReadCommand_Status s) = nullptr;
+    void (*U6_AsyncReadManagerManaged_ReadCompleteCallback)(AsyncReadCommand *c, AsyncReadCommand_Status s) = nullptr;
+    void (*U6_AsyncReadManagerManaged_CloseCompleteCallback)(AsyncReadCommand *c, AsyncReadCommand_Status s) = nullptr;
+    void (*U6_AsyncReadManagerManaged_CloseCachedFileCompleteCallback)(AsyncReadCommand *c, AsyncReadCommand_Status s) = nullptr;
+    void (*U6_AsyncUploadManager_AsyncReadSuccess)(AsyncUploadManager *t, AsyncReadCommand *c) = nullptr;
+    Int128 (*U6_AsyncUploadManager_QueueUploadAsset)(AsyncUploadManager *t, char const* x, VFS_FileSize y, unsigned int z, unsigned int a, AsyncUploadHandler* b, AssetContext *c, unsigned char* d, FileReadFlags e) = nullptr;
+    void (*U6_AsyncUploadManager_AsyncResourceUpload)(AsyncUploadManager *t, GfxDevice *x, int y, AsyncUploadManagerSettings *z) = nullptr;
+    void (*U6_AsyncUploadManager_AsyncReadCallbackStatic)(AsyncReadCommand *c, AsyncReadCommand_Status s) = nullptr;
+    void (*U6_AsyncUploadManager_ScheduleAsyncCommandsInternal)(AsyncUploadManager *t) = nullptr;
+    void (*U6_AsyncUploadManager_CloseFile)(AsyncUploadManager *t, char* s) = nullptr;
+    void (*U6_SignalCallback)(AsyncReadCommand *c, AsyncReadCommand_Status s) = nullptr;
+    void (*U6_SyncReadRequest)(AsyncReadCommand* c) = nullptr;
+    
+    void (*U6_ArchiveStorageConverter_ArchiveStorageConverter)(ArchiveStorageConverter* c, IArchiveStorageConverterListener* l, bool b) = nullptr;
+    int (*U6_ArchiveStorageConverter_ProcessAccumulatedData)(ArchiveStorageConverter* c) = nullptr;
+    int (*U6_AssetBundleLoadFromStreamAsyncOperation_FeedStream)(AssetBundleLoadFromStreamAsyncOperation *o, void const* x, unsigned long y) = nullptr;
+    int (*U6_LoadFMODSound)(SoundHandle_Instance** si, char const* s, unsigned int f, SampleClip* c, unsigned int i, VFS_FileSize fs, FMOD_CREATESOUNDEXINFO* in) = nullptr;
 }
 
 #include <signal.h>
+
+static char* unity_version;
+static int unity_version_int[3] = {0, 0, 0};
+
+static void UnityVersion_UnityVersion(UnityVersion* u, const char* s)
+{
+    LOG(LL_TRACE, LCF_HACKS, "UnityVersion_UnityVersion called with version %s", s);
+    if (unity_version_int[0] == 0) {
+        unity_version = strdup(s);
+        
+        char* t = strtok(unity_version, ".");
+        
+        for (int i=0; (i < 3) && (t != nullptr); i++) {
+            unity_version_int[i] = atoi(t);
+            LOG(LL_TRACE, LCF_HACKS, "Version %d", unity_version_int[i]);
+            t = strtok(nullptr, ".");
+        }
+    }
+
+    return orig::UnityVersion_UnityVersion(u, s);
+}
+
+static int GetUnityVersionMaj()
+{
+    if (unity_version_int[0] != 0)
+        return unity_version_int[0];
+    else {
+        /* Try to guess the version from the hooked functions */
+        if (orig::U4_JobScheduler_ProcessJob)
+            unity_version_int[0] = 4;
+        else if (orig::U5_JobQueue_Exec)
+            unity_version_int[0] = 5;
+        else if (orig::U6_ujob_execute_job)
+            unity_version_int[0] = 6000;
+        else
+            unity_version_int[0] = 2018; // TODO!
+    }
+    return unity_version_int[0];
+}
 
 static long U4_JobScheduler_FetchNextJob(JobScheduler* t, int* x)
 {
@@ -142,9 +328,12 @@ static long U4_JobScheduler_FetchNextJob(JobScheduler* t, int* x)
     ThreadInfo* thread = ThreadManager::getCurrentThread();
     thread->unityThread = true;
     
-    /* Return 0 to prevent worker threads from executing a job */
-    return 0;
-    // return orig::U4_JobScheduler_FetchNextJob(t, x);
+    if (Global::shared_config.game_specific_sync & SharedConfig::GC_SYNC_UNITY_JOBS) {
+        /* Return 0 to prevent worker threads from executing a job */
+        return 0;
+    }
+
+    return orig::U4_JobScheduler_FetchNextJob(t, x);
 }
 
 static void U4_JobScheduler_ProcessJob(JobScheduler* t, JobInfo* x, int y)
@@ -178,6 +367,7 @@ static void* U4_ExecJob(void* arg)
     ThreadInfo* th = ThreadManager::getCurrentThread();
     th->unityJobCount++;
     
+    PROFILE_SCOPE("Job", PROFILER_INFO_UNITY);
     U4_Job* j = reinterpret_cast<U4_Job*>(arg);
     void* ret = j->func(j->arg);
     delete j;
@@ -232,6 +422,7 @@ static long U5_JobQueue_EnqueueAllInternal(JobQueue* t, JobGroup* x, JobGroup* y
 static long U5_JobQueue_Exec(JobQueue* t, JobInfo* x, long long y, int z)
 {
     LOG(LL_TRACE, LCF_HACKS, "U5_JobQueue_Exec called with JobInfo %p", x);
+    PROFILE_SCOPE("Job", PROFILER_INFO_UNITY);
     long executed = orig::U5_JobQueue_Exec(t, x, y, z);
     if (executed) {
         ThreadInfo* th = ThreadManager::getCurrentThread();
@@ -244,8 +435,10 @@ static long U5_JobQueue_Exec(JobQueue* t, JobInfo* x, long long y, int z)
 static long U5_JobQueue_ExecuteJobFromQueue(JobQueue* t)
 {
     LOGTRACE(LCF_HACKS);
-    return 0;
-    // return orig::U5_JobQueue_ExecuteJobFromQueue(t);
+    if (Global::shared_config.game_specific_sync & SharedConfig::GC_SYNC_UNITY_JOBS)
+        return 0;
+    
+    return orig::U5_JobQueue_ExecuteJobFromQueue(t);
 }
 
 static bool U5_JobQueue_ExecuteOneJob(JobQueue *t)
@@ -273,15 +466,17 @@ static long U5_JobQueue_ProcessJobs(JobQueue* t, void* x)
     ThreadInfo* thread = ThreadManager::getCurrentThread();
     thread->unityThread = true;
 
-    /* Calling U5_JobQueue_ProcessJobs() in worker threads may call
-     * U5_JobQueue_Exec() directly without fetching a job queue with 
-     * U5_JobQueue_ExecuteJobFromQueue(), so we wait indefinitively here.
-     * To call jobs pushed in this worker thread, we will use the WorkerSteal
-     * feature elsewhere.
-     */
-    if (!ThreadManager::isMainThread()) {
-        while (!Global::is_exiting) {
-            sleep(1);
+    if (Global::shared_config.game_specific_sync & SharedConfig::GC_SYNC_UNITY_JOBS) {
+        /* Calling U5_JobQueue_ProcessJobs() in worker threads may call
+         * U5_JobQueue_Exec() directly without fetching a job queue with 
+         * U5_JobQueue_ExecuteJobFromQueue(), so we wait indefinitively here.
+         * To call jobs pushed in this worker thread, we will use the WorkerSteal
+         * feature elsewhere.
+         */
+        if (!ThreadManager::isMainThread()) {
+            while (!Global::is_exiting) {
+                NATIVECALL(sleep(1));
+            }
         }
     }
 
@@ -303,12 +498,13 @@ static JobGroupID U5_JobQueue_ScheduleGroup(JobQueue *t, JobGroup* x, int y)
     JobGroupID j = orig::U5_JobQueue_ScheduleGroup(t, x, y);
     LOG(LL_DEBUG, LCF_HACKS, "    returns JobGroup %p and JobGroup tag %d", j.group, j.tag);
 
-    /* Immediatly wait for the job */
-    if (orig::U5_JobQueue_WaitForJobGroup)
-        orig::U5_JobQueue_WaitForJobGroup(t, j.group, j.tag, true);
+    if (Global::shared_config.game_specific_sync & SharedConfig::GC_SYNC_UNITY_JOBS) {
+        /* Immediatly wait for the job */
+        if (orig::U5_JobQueue_WaitForJobGroup)
+            orig::U5_JobQueue_WaitForJobGroup(t, j.group, j.tag, true);
+    }
 
     return j;
-    // return orig::U5_JobQueue_ScheduleGroup(t, x, y);
 }
 
 static void U5_JobQueue_ScheduleGroups(JobQueue *t, JobGroup* x, JobGroup* y)
@@ -344,6 +540,7 @@ static void U2K_JobQueue_CompleteAllJobs(JobQueue *t)
 static long U2K_JobQueue_Exec(JobQueue *t, JobInfo* x, long long y, int z, bool a)
 {
     LOG(LL_TRACE, LCF_HACKS, "U2K_JobQueue_Exec called with JobInfo %p and sync %d", x, a);
+    PROFILE_SCOPE("Job", PROFILER_INFO_UNITY);
     long executed = orig::U2K_JobQueue_Exec(t, x, y, z, a);
     if (executed) {
         ThreadInfo* th = ThreadManager::getCurrentThread();
@@ -355,8 +552,10 @@ static long U2K_JobQueue_Exec(JobQueue *t, JobInfo* x, long long y, int z, bool 
 static long U2K_JobQueue_ExecuteJobFromQueue(JobQueue *t, bool x)
 {
     LOG(LL_TRACE, LCF_HACKS, "U2K_JobQueue_ExecuteJobFromQueue called with sync %d", x);
-    return 0;
-    // return orig::U2K_JobQueue_ExecuteJobFromQueue(t, x);
+    if (Global::shared_config.game_specific_sync & SharedConfig::GC_SYNC_UNITY_JOBS)
+        return 0;
+        
+    return orig::U2K_JobQueue_ExecuteJobFromQueue(t, x);
 }
 
 static long U2K_JobQueue_ProcessJobs(JobQueue_ThreadInfo* x, void* y)
@@ -371,8 +570,12 @@ static long U2K_JobQueue_ProcessJobs(JobQueue_ThreadInfo* x, void* y)
 static void U2K_JobQueue_ScheduleDependencies(JobQueue *t, JobGroupID *x, JobInfo *y, JobInfo *z, bool a)
 {
     LOG(LL_TRACE, LCF_HACKS, "U2K_JobQueue_ScheduleDependencies called with sync %d", a);
-    // return orig::U2K_JobQueue_ScheduleDependencies(t, x, y, z, a);
-    return orig::U2K_JobQueue_ScheduleDependencies(t, x, y, z, true);
+    if (Global::shared_config.game_specific_sync & SharedConfig::GC_SYNC_UNITY_JOBS) {
+        /* We enforce the worker steal flag, to be able to execute jobs from other threads */
+        return orig::U2K_JobQueue_ScheduleDependencies(t, x, y, z, true);
+    }
+
+    return orig::U2K_JobQueue_ScheduleDependencies(t, x, y, z, a);
 }
 
 static long U2K_JobQueue_ScheduleJobMultipleDependencies(JobQueue *t, void (*x)(void*), void* y, JobGroupID* z, int a, MemLabelId b)
@@ -404,7 +607,7 @@ static void U2K_JobQueue_WaitForJobGroupID(JobQueue* /* or ujob_control_t* */ t 
 
 static int U6_job_completed(ujob_control_t* x, ujob_lane_t* y, ujob_job_t* z, ujob_handle_t a)
 {
-    LOG(LL_TRACE, LCF_HACKS, "U6_job_completed called with job %p and handle %p", z, a);
+    // LOG(LL_TRACE, LCF_HACKS, "U6_job_completed called with job %p and handle %p", z, a);
     int ret = orig::U6_job_completed(x, y, z, a);
     return ret;
 }
@@ -429,7 +632,7 @@ static int U6_JobsUtility_CUSTOM_Schedule(JobScheduleParameters* x, JobFence* y)
 
 static bool U6_lane_guts(ujob_control_t* x, ujob_lane_t* y, int z, int a, ujob_dependency_chain const* b)
 {
-    LOGTRACE(LCF_HACKS);
+    // LOGTRACE(LCF_HACKS);
     return orig::U6_lane_guts(x, y, z, a, b);
 }
 
@@ -441,7 +644,7 @@ static long U6_ScheduleBatchJob(void* x, ujob_handle_t y)
 
 static void U6_ujobs_add_to_lane_and_wake_one_thread(ujob_control_t* x, ujob_job_t* y, ujob_lane_t* z)
 {
-    LOGTRACE(LCF_HACKS);
+    // LOGTRACE(LCF_HACKS);
     orig::U6_ujobs_add_to_lane_and_wake_one_thread(x, y, z);
 }
 
@@ -450,12 +653,13 @@ static void U6_ujob_execute_job(ujob_control_t* x, ujob_lane_t* y, ujob_job_t* z
     LOGTRACE(LCF_HACKS);
     ThreadInfo* th = ThreadManager::getCurrentThread();
     th->unityJobCount++;
+    PROFILE_SCOPE("Job", PROFILER_INFO_UNITY);
     return orig::U6_ujob_execute_job(x, y, z, a, b);
 }
 
 static void U6_ujob_participate(ujob_control_t* x, ujob_handle_t y, ujob_job_t** z, int* a, ujob_dependency_chain const* b)
 {
-    LOGTRACE(LCF_HACKS);
+    // LOGTRACE(LCF_HACKS);
     orig::U6_ujob_participate(x, y, z, a, b);
 }
 
@@ -464,8 +668,14 @@ static unsigned long U6_ujob_schedule_job_internal(ujob_control_t* x, ujob_handl
     LOGTRACE(LCF_HACKS);
     unsigned long ret = orig::U6_ujob_schedule_job_internal(x, y, z);
     
-    if (orig::U2K_JobQueue_WaitForJobGroupID)
-        orig::U2K_JobQueue_WaitForJobGroupID(reinterpret_cast<JobQueue*>(x), reinterpret_cast<JobGroup*>(y), 0, true);
+    if (Global::shared_config.game_specific_sync & SharedConfig::GC_SYNC_UNITY_JOBS) {
+        /* In newer Unity 6 versions, there is a dedicated internal function for
+         * waiting on a job */
+        if (orig::U6_ujob_wait_for)
+            orig::U6_ujob_wait_for(x, y, 1);
+        else if (orig::U2K_JobQueue_WaitForJobGroupID)
+            orig::U2K_JobQueue_WaitForJobGroupID(reinterpret_cast<JobQueue*>(x), reinterpret_cast<JobGroup*>(y), 0, true);
+    }
 
     return ret;
 }
@@ -491,17 +701,24 @@ static void* job_callback(void* arg, int)
  *     WorkStealingRange *param_4, uint param_5, uint param_6,
  *     ujob_handle_t *param_7, int param_8, uchar param_9)
  */ 
-static long U6_ujob_schedule_parallel_for_internal(ujob_control_t* x, JobsCallbackFunctions* y, void* job_callback_arg, WorkStealingRange* a, unsigned int count, unsigned long c, ujob_handle_t const* d, long e)
+static ujob_handle_t U6_ujob_schedule_parallel_for_internal(ujob_control_t* x, JobsCallbackFunctions* y, void* job_callback_arg, WorkStealingRange* a, unsigned int count, unsigned long c, ujob_handle_t const* d, long e)
 {
     LOG(LL_TRACE, LCF_HACKS, "U6_ujob_schedule_parallel_for_internal called with callback %p, steal mode %d, unknown uint %d", *y, a?(*a):0, count);
 
-    long ret = 0;
+    if (!(Global::shared_config.game_specific_sync & SharedConfig::GC_SYNC_UNITY_JOBS))
+        return orig::U6_ujob_schedule_parallel_for_internal(x, y, job_callback_arg, a, count, c, d, e);
+
+    ujob_handle_t ret = 0;
     static JobsCallbackFunctions loop_callback = &job_callback;
 
     if (count == 1) {
         ret = orig::U6_ujob_schedule_parallel_for_internal(x, y, job_callback_arg, a, count, c, d, e);
         
-        if (orig::U2K_JobQueue_WaitForJobGroupID)
+        /* In newer Unity 6 versions, there is a dedicated internal function for
+         * waiting on a job */
+        if (orig::U6_ujob_wait_for)
+            orig::U6_ujob_wait_for(x, ret, 1);
+        else if (orig::U2K_JobQueue_WaitForJobGroupID)
             orig::U2K_JobQueue_WaitForJobGroupID(reinterpret_cast<JobQueue*>(x), reinterpret_cast<JobGroup*>(ret), 0, true);
     }
     else {
@@ -521,7 +738,9 @@ static long U6_ujob_schedule_parallel_for_internal(ujob_control_t* x, JobsCallba
             
             ret = orig::U6_ujob_schedule_parallel_for_internal(x, &loop_callback, args, a, 1, c, d, e);
             
-            if (orig::U2K_JobQueue_WaitForJobGroupID)
+            if (orig::U6_ujob_wait_for)
+                orig::U6_ujob_wait_for(x, ret, 1);
+            else if (orig::U2K_JobQueue_WaitForJobGroupID)
                 orig::U2K_JobQueue_WaitForJobGroupID(reinterpret_cast<JobQueue*>(x), reinterpret_cast<JobGroup*>(ret), 0, true);
 
             /* It should be safe to delete our custom callback argument here */
@@ -532,6 +751,12 @@ static long U6_ujob_schedule_parallel_for_internal(ujob_control_t* x, JobsCallba
     return ret;
 }
 
+static void U6_ujob_wait_for(ujob_control_t *x, ujob_handle_t y, int z)
+{
+    LOGTRACE(LCF_HACKS);
+    return orig::U6_ujob_wait_for(x, y, z);
+}
+
 static void U6_worker_thread_routine(void* x)
 {
     LOGTRACE(LCF_HACKS);
@@ -540,7 +765,505 @@ static void U6_worker_thread_routine(void* x)
     return orig::U6_worker_thread_routine(x);
 }
 
+/* This is what I understand from how operations are handled:
+ *
+ * PreloadManager::AddToQueue:
+ *   an operation is pushed inside a list of pending operations located in
+ *   the PreloadManager struct (located in pm+0x318).
+ *
+ * PreloadManager::Run:
+ *   Function ran by the Loading.Preload thread. It is constantly choosing,
+ *   among the list of pending operations, the
+ *   operation with the highest priority (PreloadManagerOperation::GetPriority),
+ *   and then it pulls the operation from the list, and pushed it into a 
+ *   second list of active operations (pm+0x338). This code is performed by the
+ *   function PreloadManager::PrepareProcessingPreloadOperation() when it exists
+ *
+ *   Then it does some waiting, depending on some
+ *   function results (CanLoadObjects, CanPerformWhileObjectsLoading).
+ *
+ *   Then it calls PreloadManagerOperation::Perform to initiate the operation.
+ *
+ *   It waits even more if PreloadManagerOperation::GetAllowParallelExecution
+ *   returns true.
+ *
+ * PreloadManager::UpdatePreloadingSingleStep:
+ *   Called by either PreloadManager::UpdatePreloading or 
+ *   PreloadManager::WaitForAllAsyncOperationsToComplete.
+ *
+ *   Has an UpdatePreloadingFlags parameter which contains two flags:
+ *   - if bit 0 is set, the update will not wake (or even create) the 
+ *     Loading.Preload thread. So no operation will be moved from pending to active
+ *   - if bit 1 is set, all finished operations are processed. Otherwise some of
+ *     them are left in the active list
+ *     (depending on PreloadManagerOperation::GetAllowSceneActivation?)
+ *
+ *   It takes the first active operation and calls PreloadManagerOperation::IntegrateTimeSliced.
+ *
+ *   If this function returns non-zero, I think it means that the operation
+ *   was completed. In that case, it finishes processing the
+ *   operation only under certain conditions: either 
+ *   PreloadManagerOperation::GetAllowSceneActivation returns true, or 
+ *   passed UpdatePreloadingFlags was non-zero.
+ *
+ *   In that case, it pulls the operation from the list of active operations,
+ *   it calls PreloadManagerOperation::IntegrateMainThread, and finally
+ *   PreloadManagerOperation::InvokeCoroutine.
+ *
+ *   It returns some value and bit 0 set (to guarantee a non-zero value).
+ *
+ * PreloadManager::UpdatePreloading:
+ *   Called once each frame.
+ *   Looks for all pending and active operations. If one returns true for
+ *   PreloadManagerOperation::MustCompleteNextFrame, then it calls 
+ *   PreloadManager::WaitForAllAsyncOperationsToComplete.
+ *
+ *   Otherwise, it calls UpdatePreloadingSingleStep in a loop until this 
+ *   function returns 0.
+ *
+ * PreloadManager::WaitForAllAsyncOperationsToComplete:
+ *   Calls PreloadManager::UpdatePreloadingSingleStep with UpdatePreloadingFlags
+ *   being 2, in a loop while this function
+ *   returns non-zero. If this function returns zero twice in a row, then it
+ *   goes into wait mode (baselib::UnityClassic::CappedSemaphore::TryTimedAcquire()).
+ * 
+ *   It stops when there is no operation in both the pending list and the active list.
+ */
 
+/* For statistics */
+static int added_count = 0;
+static int processed_count = 0;
+
+static bool is_preload_thread_running = false;
+
+/* These two variables will keep track of the pending queue size and if the 
+ * last activate operation was a non-parallel. We avoid as much as possible 
+ * using struct internals, only relying on function calls */
+static std::atomic<int> pending_queue_size;
+static std::atomic<bool> is_current_pending_operation_non_parallel;
+
+static bool Helper_PreloadManager_GetAllowParallelExecution(PreloadManagerOperation* o)
+{
+    if (GetUnityVersionMaj() == 6000)
+        return (reinterpret_cast<U6_PreloadManagerOperation*>(o))->GetAllowParallelExecution(o);
+    if ((GetUnityVersionMaj() >= 2017) && (GetUnityVersionMaj() <= 2020))
+        return (reinterpret_cast<U2018_PreloadManagerOperation*>(o))->GetAllowParallelExecution(o);
+    if (GetUnityVersionMaj() == 5)
+        return (reinterpret_cast<U5_PreloadManagerOperation*>(o))->GetAllowParallelExecution(o);
+    if (GetUnityVersionMaj() == 4)
+        return true;
+
+    LOG(LL_WARN, LCF_HACKS | LCF_FILEIO, "    PreloadManagerOperation struct for this Unity version is not known");
+    return true;
+}
+
+/* This helper function waits until the pending queue is empty (after the last
+ * operation was processed, this is important!), or if the Preload thread is
+ * currently waiting on a non-parallel operation */
+static void Helper_PreloadManager_WaitForQueueToProcess(PreloadManager* m, PreloadManagerOperation* o)
+{
+    /* Special case for when the preload thread is not running, hence it cannot
+     * process operations. */
+    if (!is_preload_thread_running)
+        return;
+
+    int i;
+    for (i=0; i < 4000; i++) {
+        /* If possible, we rely on these two functions to be hooked */
+        if (orig::U6_PreloadManager_PrepareProcessingPreloadOperation && orig::U6_PreloadManager_ProcessSingleOperation) {
+            if (pending_queue_size == 0)
+                break;
+
+            /* Check if the pending operation is non-parallel */
+            if (is_current_pending_operation_non_parallel)
+                break;
+        }
+        else {
+            /* This sucks, we must rely on internals to get what we want... */
+            if (GetUnityVersionMaj() == 6000) {
+                bool pending_queue_empty = false;
+                if (o) {
+                    /* Operation status goes from 0 (queued) -> 1 (active) -> 2 (done) */
+                    /* Check if the operation was pushed (status == 1) */
+                    pending_queue_empty = (1 == *(int *)(o + 0x40));
+                    // pending_queue_empty = (1 == *(int *)(o + 0x48));
+                }
+                else
+                    pending_queue_empty = (0 == *(int *)(m + 0x328));
+                if (pending_queue_empty)
+                    break;
+
+                /* Get the currently processed operation */
+                long active_list_size = *(long *)(m + 0x348);
+                if (active_list_size > 0) {
+                    PreloadManagerOperation* current_pending_operation = *(PreloadManagerOperation **) (*(long *)(m + 0x338) + (active_list_size - 1) * 8);
+                    
+                    if (current_pending_operation) {
+                        /* Check if the pending operation is non-parallel */
+                        if (!Helper_PreloadManager_GetAllowParallelExecution(current_pending_operation)) {
+                            LOG(LL_WARN, LCF_HACKS | LCF_FILEIO, "    exiting wait because of non-parallel");
+                            break;
+                        }
+                    }
+                }
+            }
+            else {
+                LOG(LL_WARN, LCF_HACKS | LCF_FILEIO, "    does not know how to wait for the queue to be processed");                
+            }
+        }
+        
+        NATIVECALL(usleep(1000));
+    }
+    if (i == 4000) {
+        LOG(LL_WARN, LCF_HACKS | LCF_FILEIO, "    timeout waiting for operation to be processed by Loading.Preload thread");
+    }
+}
+
+static void U6_PreloadManager_AddToQueue(PreloadManager* m, PreloadManagerOperation* o)
+{
+    LOGTRACE(LCF_HACKS | LCF_FILEIO);
+    
+    orig::U6_PreloadManager_AddToQueue(m, o);
+    added_count++;
+    pending_queue_size++;
+
+    if (Global::shared_config.game_specific_sync & SharedConfig::GC_SYNC_UNITY_LOADS) {
+        /* We must make sure that each operation pushed to the queue is activated
+         * by the Loading.Preload thread immediately. If we don't do that, the order of
+         * activated operations is not guaranteed. Indeed, the Loading.Preload chooses
+         * the next operation to activate based on the PreloadManagerOperation::GetPriority()
+         * result. So, depending on which operations were pushed, the order of active
+         * operations may vary.
+         *
+         * There is one extra difficulty: when an operation returns false for
+         * PreloadManagerOperation::GetAllowParallelExecution(), then it means that
+         * after the operation is activated by the Loading.Preload thread, it
+         * waits until the operation is handled by the main thread inside
+         * PreloadManager::UpdatePreloadingSingleStep. Until this function is called,
+         * any new operation will be queue and not activated.
+         *
+         * In this case, we cannot wait for all the operations to be activated. We
+         * must delay until after PreloadManager::UpdatePreloadingSingleStep call.
+         */
+
+        Helper_PreloadManager_WaitForQueueToProcess(m, o);
+    }
+}
+
+static PreloadManagerOperation* U6_PreloadManager_PrepareProcessingPreloadOperation(PreloadManager* m)
+{
+    LOGTRACE(LCF_HACKS | LCF_FILEIO);
+    PreloadManagerOperation* current_pending_operation = orig::U6_PreloadManager_PrepareProcessingPreloadOperation(m);
+    
+    if (Global::shared_config.game_specific_sync & SharedConfig::GC_SYNC_UNITY_LOADS) {
+        /* After the end of this function, we don't know for how long the 
+         * operation object will be alive. So we extract the information we want
+         * from the operation here */
+        if (current_pending_operation)
+            is_current_pending_operation_non_parallel = !Helper_PreloadManager_GetAllowParallelExecution(current_pending_operation);
+        else
+            is_current_pending_operation_non_parallel = false;
+    }
+    
+    return current_pending_operation;
+}
+
+static void U6_PreloadManager_ProcessSingleOperation(PreloadManager* m)
+{
+    LOGTRACE(LCF_HACKS | LCF_FILEIO);
+    PROFILE_SCOPE("Operation", PROFILER_INFO_UNITY);
+    orig::U6_PreloadManager_ProcessSingleOperation(m);
+    pending_queue_size--;
+}
+
+static void U6_PreloadManager_UpdatePreloading(PreloadManager* m)
+{
+    LOGTRACE(LCF_HACKS | LCF_FILEIO);
+
+    orig::U6_PreloadManager_UpdatePreloading(m);
+
+    UnityDebug::update_preload(added_count, processed_count);
+    added_count = 0;
+    processed_count = 0;
+}
+
+static long U4_PreloadManager_UpdatePreloadingSingleStep(PreloadManager* m, bool i)
+{
+    LOG(LL_TRACE, LCF_HACKS | LCF_FILEIO, "U4_PreloadManager_UpdatePreloadingSingleStep called with bool %d", i);
+
+    long ret = orig::U4_PreloadManager_UpdatePreloadingSingleStep(m, i);
+    
+    if (!ret) {
+        return ret;
+    }
+    
+    /* An operation was finished */
+    processed_count++;
+
+    /* In Unity 4, there is no non-parallel operations, so we don't have to 
+     * do anything here, all sync is done in U6_PreloadManager_AddToQueue */
+    return ret;
+}
+
+static long U6_PreloadManager_UpdatePreloadingSingleStep(PreloadManager* m, PreloadManager_UpdatePreloadingFlags f, int i)
+{
+    LOG(LL_TRACE, LCF_HACKS | LCF_FILEIO, "U6_PreloadManager_UpdatePreloadingSingleStep called with flags %lx and int %d", f, i);
+
+    bool was_pending_queue_size = pending_queue_size;
+    bool was_preload_thread_running = is_preload_thread_running;
+
+    long ret = orig::U6_PreloadManager_UpdatePreloadingSingleStep(m, f, i);
+    
+    /* If no operation was finished, we can return immediately, as there is no
+     * waiting to do. */
+    if (!ret) {
+        return ret;
+    }
+    
+    /* An operation was finished */
+    processed_count++;
+    
+    if (Global::shared_config.game_specific_sync & SharedConfig::GC_SYNC_UNITY_LOADS) {
+        /* If there are pending operations, it is likely that this call processed a
+         * non-parallel operation. Thus, we must wait for the Preload thread to 
+         * activate pending operations. We must also wait for the case of the very
+         * first call, as the Preload thread was not created yet. */
+        if ((was_pending_queue_size > 0) || !was_preload_thread_running)
+            Helper_PreloadManager_WaitForQueueToProcess(m, nullptr);
+    }
+
+    return ret;
+}
+
+static void U6_PreloadManager_WaitForAllAsyncOperationsToComplete(PreloadManager* m)
+{
+    LOGTRACE(LCF_HACKS | LCF_FILEIO);
+    return orig::U6_PreloadManager_WaitForAllAsyncOperationsToComplete(m);
+}
+
+static long U6_PreloadManager_Run(void* p)
+{
+    LOGTRACE(LCF_HACKS | LCF_FILEIO);
+    is_preload_thread_running = true;
+    return orig::U6_PreloadManager_Run(p);
+}
+
+static PreloadManagerOperation* U2K_PreloadManager_PeekIntegrateQueue(PreloadManager* m)
+{
+    LOGTRACE(LCF_HACKS | LCF_FILEIO);
+    return orig::U2K_PreloadManager_PeekIntegrateQueue(m);
+}
+
+static bool U2K_PreloadManager_IsLoadingOrQueued(PreloadManager* m)
+{
+    LOGTRACE(LCF_HACKS | LCF_FILEIO);
+    return orig::U2K_PreloadManager_IsLoadingOrQueued(m);
+}
+
+static std::mutex async_read_mutex;
+static std::condition_variable async_read_condition;
+static bool async_read_complete = true;
+
+static void U5_AsyncReadManagerThreaded_WaitDone(AsyncReadManagerThreaded *t, AsyncReadCommand *c)
+{
+    LOGTRACE(LCF_HACKS | LCF_FILEIO);
+    return orig::U5_AsyncReadManagerThreaded_WaitDone(t, c);
+}
+
+static void U6_AsyncReadManagerThreaded_Request(AsyncReadManagerThreaded *t, AsyncReadCommand *c)
+{
+    char* filepath = *(char**)c;
+    LOG(LL_TRACE, LCF_HACKS | LCF_FILEIO, "U6_AsyncReadManagerThreaded_Request called with file %s", filepath);
+
+    if (!(Global::shared_config.game_specific_sync & SharedConfig::GC_SYNC_UNITY_READS))
+        return orig::U6_AsyncReadManagerThreaded_Request(t, c);
+
+    void* complete_callback = *((void**)(c + 0x38));
+    // void* complete_callback_arg = *((void**)(c + 0x40));
+
+    /* If possible, we can use this nice helper function that performs a sync
+     * read from a command. I didn't experienced any softlock for now. */
+    if (orig::U6_SyncReadRequest) {
+        return orig::U6_SyncReadRequest(c);
+    }
+
+    if (orig::U2K_AsyncReadManagerThreaded_SyncRequest) {
+        return orig::U2K_AsyncReadManagerThreaded_SyncRequest(t, c);
+    }
+
+    /* This function is less preferable, because it still performs the read in
+     * another thread. */
+    if (orig::U5_AsyncReadManagerThreaded_WaitDone) {
+        orig::U6_AsyncReadManagerThreaded_Request(t, c);
+        orig::U5_AsyncReadManagerThreaded_WaitDone(t, c);
+        return;
+    }
+
+    if (complete_callback != 0) {
+        /* We wait until the complete callback is called. */
+        std::unique_lock<std::mutex> lock(async_read_mutex);
+        async_read_complete = false;
+
+        orig::U6_AsyncReadManagerThreaded_Request(t, c);
+        
+        async_read_condition.wait(lock, [] { return async_read_complete; });
+    }
+    else {
+        orig::U6_AsyncReadManagerThreaded_Request(t, c);
+    }
+}
+
+static void U2K_AsyncReadManagerThreaded_SyncRequest(AsyncReadManagerThreaded *t, AsyncReadCommand *c)
+{
+    char* filepath = *(char**)c;
+    LOG(LL_TRACE, LCF_HACKS | LCF_FILEIO, "U2K_AsyncReadManagerThreaded_SyncRequest called with file %s", filepath);
+    
+    return orig::U2K_AsyncReadManagerThreaded_SyncRequest(t, c);
+}
+
+/* These are all AsyncReadCommand complete callback used */
+
+static void U6_AsyncReadManagerManaged_OpenCompleteCallback(AsyncReadCommand *c, AsyncReadCommand_Status s)
+{
+    LOGTRACE(LCF_HACKS | LCF_FILEIO);
+    
+    orig::U6_AsyncReadManagerManaged_OpenCompleteCallback(c, s);
+    
+    if (Global::shared_config.game_specific_sync & SharedConfig::GC_SYNC_UNITY_READS) {
+        std::unique_lock<std::mutex> lock(async_read_mutex);
+        async_read_complete = true;
+        async_read_condition.notify_all();
+    }
+}
+
+static void U6_AsyncReadManagerManaged_ReadCompleteCallback(AsyncReadCommand *c, AsyncReadCommand_Status s)
+{
+    LOGTRACE(LCF_HACKS | LCF_FILEIO);
+
+    orig::U6_AsyncReadManagerManaged_ReadCompleteCallback(c, s);
+
+    if (Global::shared_config.game_specific_sync & SharedConfig::GC_SYNC_UNITY_READS) {
+        std::unique_lock<std::mutex> lock(async_read_mutex);
+        async_read_complete = true;
+        async_read_condition.notify_all();
+    }
+}
+
+static void U6_AsyncReadManagerManaged_CloseCompleteCallback(AsyncReadCommand *c, AsyncReadCommand_Status s)
+{
+    LOGTRACE(LCF_HACKS | LCF_FILEIO);
+
+    orig::U6_AsyncReadManagerManaged_CloseCompleteCallback(c, s);
+
+    if (Global::shared_config.game_specific_sync & SharedConfig::GC_SYNC_UNITY_READS) {
+        std::unique_lock<std::mutex> lock(async_read_mutex);
+        async_read_complete = true;
+        async_read_condition.notify_all();
+    }
+}
+
+static void U6_AsyncReadManagerManaged_CloseCachedFileCompleteCallback(AsyncReadCommand *c, AsyncReadCommand_Status s)
+{
+    LOGTRACE(LCF_HACKS | LCF_FILEIO);
+
+    orig::U6_AsyncReadManagerManaged_CloseCachedFileCompleteCallback(c, s);
+
+    if (Global::shared_config.game_specific_sync & SharedConfig::GC_SYNC_UNITY_READS) {
+        std::unique_lock<std::mutex> lock(async_read_mutex);
+        async_read_complete = true;
+        async_read_condition.notify_all();
+    }
+}
+
+static void U6_SignalCallback(AsyncReadCommand *c, AsyncReadCommand_Status s)
+{
+    LOGTRACE(LCF_HACKS | LCF_FILEIO);
+    
+    orig::U6_SignalCallback(c, s);
+
+    if (Global::shared_config.game_specific_sync & SharedConfig::GC_SYNC_UNITY_READS) {
+        std::unique_lock<std::mutex> lock(async_read_mutex);
+        async_read_complete = true;
+        async_read_condition.notify_all();
+    }
+}
+
+static void U6_AsyncUploadManager_AsyncReadCallbackStatic(AsyncReadCommand *c, AsyncReadCommand_Status s)
+{
+    LOGTRACE(LCF_HACKS | LCF_FILEIO);
+
+    if (Global::shared_config.game_specific_sync & SharedConfig::GC_SYNC_UNITY_READS) {
+        std::unique_lock<std::mutex> lock(async_read_mutex);
+        async_read_complete = true;
+        async_read_condition.notify_all();
+    }
+
+    orig::U6_AsyncUploadManager_AsyncReadCallbackStatic(c, s);
+}
+
+/* End of callbacks */
+
+static void U6_AsyncUploadManager_AsyncReadSuccess(AsyncUploadManager *t, AsyncReadCommand *c)
+{
+    LOGTRACE(LCF_HACKS | LCF_FILEIO);
+    return orig::U6_AsyncUploadManager_AsyncReadSuccess(t, c);
+}
+
+static Int128 U6_AsyncUploadManager_QueueUploadAsset(AsyncUploadManager *t, char const* x, VFS_FileSize y, unsigned int z, unsigned int a, AsyncUploadHandler* b, AssetContext *c, unsigned char* d, FileReadFlags e)
+{
+    LOGTRACE(LCF_HACKS | LCF_FILEIO);
+    return orig::U6_AsyncUploadManager_QueueUploadAsset(t, x, y, z, a, b, c, d, e);
+}
+
+static void U6_AsyncUploadManager_AsyncResourceUpload(AsyncUploadManager *t, GfxDevice *x, int y, AsyncUploadManagerSettings *z)
+{
+    LOGTRACE(LCF_HACKS | LCF_FILEIO);
+    return orig::U6_AsyncUploadManager_AsyncResourceUpload(t, x, y, z);
+}
+
+static void U6_AsyncUploadManager_ScheduleAsyncCommandsInternal(AsyncUploadManager *t)
+{
+    LOGTRACE(LCF_HACKS | LCF_FILEIO);
+    return orig::U6_AsyncUploadManager_ScheduleAsyncCommandsInternal(t);
+}
+
+static void U6_AsyncUploadManager_CloseFile(AsyncUploadManager *t, char* s)
+{
+    LOGTRACE(LCF_HACKS | LCF_FILEIO);
+    return orig::U6_AsyncUploadManager_CloseFile(t, s);
+}
+
+static void U6_SyncReadRequest(AsyncReadCommand* c)
+{
+    char* filepath = *(char**)c;
+    LOG(LL_TRACE, LCF_HACKS | LCF_FILEIO, "U6_SyncReadRequest called with file %s", filepath);
+    
+    return orig::U6_SyncReadRequest(c);
+}
+
+static void U6_ArchiveStorageConverter_ArchiveStorageConverter(ArchiveStorageConverter* c, IArchiveStorageConverterListener* l, bool b)
+{
+    LOGTRACE(LCF_HACKS | LCF_FILEIO);
+    return orig::U6_ArchiveStorageConverter_ArchiveStorageConverter(c, l, b);
+}
+
+static int U6_ArchiveStorageConverter_ProcessAccumulatedData(ArchiveStorageConverter* c)
+{
+    LOGTRACE(LCF_HACKS | LCF_FILEIO);
+    return orig::U6_ArchiveStorageConverter_ProcessAccumulatedData(c);
+}
+
+static int U6_AssetBundleLoadFromStreamAsyncOperation_FeedStream(AssetBundleLoadFromStreamAsyncOperation *o, void const* x, unsigned long y)
+{
+    LOGTRACE(LCF_HACKS | LCF_FILEIO);
+    return orig::U6_AssetBundleLoadFromStreamAsyncOperation_FeedStream(o, x, y);
+}
+
+static int U6_LoadFMODSound(SoundHandle_Instance** si, char const* s, unsigned int f, SampleClip* c, unsigned int i, VFS_FileSize fs, FMOD_CREATESOUNDEXINFO* in)
+{
+    LOG(LL_TRACE, LCF_HACKS | LCF_SOUND, "U6_LoadFMODSound called with file %s and flags %x", s, f);
+    return orig::U6_LoadFMODSound(si, s, f, c, i, fs, in);
+}
 
 #define FUNC_CASE(FUNC_ENUM, FUNC_SYMBOL) \
 case FUNC_ENUM: \
@@ -554,6 +1277,8 @@ void UnityHacks::patch(int func, uint64_t addr)
     
     uintptr_t address = static_cast<uintptr_t>(addr);
     switch(func) {
+        FUNC_CASE(UNITY_VERSION, UnityVersion_UnityVersion)
+
         FUNC_CASE(UNITY4_JOBSCHEDULER_AWAKE, U4_JobScheduler_AwakeIdleWorkerThreads)
         FUNC_CASE(UNITY4_JOBSCHEDULER_FETCH, U4_JobScheduler_FetchNextJob)
         FUNC_CASE(UNITY4_JOBSCHEDULER_PROCESS, U4_JobScheduler_ProcessJob)
@@ -599,7 +1324,41 @@ void UnityHacks::patch(int func, uint64_t addr)
         FUNC_CASE(UNITY6_UJOB_PARTICIPATE, U6_ujob_participate)
         FUNC_CASE(UNITY6_UJOB_SCHEDULE, U6_ujob_schedule_job_internal)
         FUNC_CASE(UNITY6_UJOB_SCHEDULE_PARALLEL, U6_ujob_schedule_parallel_for_internal)
+        FUNC_CASE(UNITY6_UJOB_WAIT, U6_ujob_wait_for)
         FUNC_CASE(UNITY6_WORKER_THREAD_ROUTINE, U6_worker_thread_routine)
+
+        FUNC_CASE(UNITY6_PRELOADMANAGER_ADD, U6_PreloadManager_AddToQueue)
+        FUNC_CASE(UNITY6_PRELOADMANAGER_PREPARE, U6_PreloadManager_PrepareProcessingPreloadOperation)
+        FUNC_CASE(UNITY6_PRELOADMANAGER_PROCESS, U6_PreloadManager_ProcessSingleOperation)
+        FUNC_CASE(UNITY6_PRELOADMANAGER_UPDATE, U6_PreloadManager_UpdatePreloading)
+        FUNC_CASE(UNITY4_PRELOADMANAGER_UPDATE_STEP, U4_PreloadManager_UpdatePreloadingSingleStep)
+        FUNC_CASE(UNITY6_PRELOADMANAGER_UPDATE_STEP, U6_PreloadManager_UpdatePreloadingSingleStep)
+        FUNC_CASE(UNITY6_PRELOADMANAGER_WAIT, U6_PreloadManager_WaitForAllAsyncOperationsToComplete)
+        FUNC_CASE(UNITY6_PRELOADMANAGER_RUN, U6_PreloadManager_Run)
+        FUNC_CASE(UNITY2K_PRELOADMANAGER_PEEK, U2K_PreloadManager_PeekIntegrateQueue)
+        FUNC_CASE(UNITY2K_PRELOADMANAGER_IS_LOADING, U2K_PreloadManager_IsLoadingOrQueued)
+
+        FUNC_CASE(UNITY6_ASYNCREADMANAGER_REQUEST, U6_AsyncReadManagerThreaded_Request)
+        FUNC_CASE(UNITY5_ASYNCREADMANAGER_WAIT_DONE, U5_AsyncReadManagerThreaded_WaitDone)
+        FUNC_CASE(UNITY2K_ASYNCREADMANAGER_SYNC_REQUEST, U2K_AsyncReadManagerThreaded_SyncRequest)
+        FUNC_CASE(UNITY6_ASYNCREADMANAGER_OPENCOMPLETE_CALLBACK, U6_AsyncReadManagerManaged_OpenCompleteCallback)
+        FUNC_CASE(UNITY6_ASYNCREADMANAGER_READCOMPLETE_CALLBACK, U6_AsyncReadManagerManaged_ReadCompleteCallback)
+        FUNC_CASE(UNITY6_ASYNCREADMANAGER_CLOSECOMPLETE_CALLBACK, U6_AsyncReadManagerManaged_CloseCompleteCallback)
+        FUNC_CASE(UNITY6_ASYNCREADMANAGER_CLOSECACHEDCOMPLETE_CALLBACK, U6_AsyncReadManagerManaged_CloseCachedFileCompleteCallback)
+        FUNC_CASE(UNITY6_ASYNCUPLOADMANAGER_ASYNC_READ_SUCCESS, U6_AsyncUploadManager_AsyncReadSuccess)
+        FUNC_CASE(UNITY6_ASYNCUPLOADMANAGER_QUEUE_UPLOAD, U6_AsyncUploadManager_QueueUploadAsset)
+        FUNC_CASE(UNITY6_ASYNCUPLOADMANAGER_ASYNC_RESOURCE_UPLOAD, U6_AsyncUploadManager_AsyncResourceUpload)
+        FUNC_CASE(UNITY6_ASYNCUPLOADMANAGER_ASYNC_READ_CALLBACK, U6_AsyncUploadManager_AsyncReadCallbackStatic)
+        FUNC_CASE(UNITY6_ASYNCUPLOADMANAGER_SCHEDULE, U6_AsyncUploadManager_ScheduleAsyncCommandsInternal)
+        FUNC_CASE(UNITY6_ASYNCUPLOADMANAGER_CLOSE, U6_AsyncUploadManager_CloseFile)
+        FUNC_CASE(UNITY6_SIGNAL_CALLBACK, U6_SignalCallback)
+        FUNC_CASE(UNITY6_SYNC_READ, U6_SyncReadRequest)
+
+        FUNC_CASE(UNITY6_ARCHIVESTORAGECONVERTER_CONSTRUCTOR, U6_ArchiveStorageConverter_ArchiveStorageConverter)
+        FUNC_CASE(UNITY6_ARCHIVESTORAGECONVERTER_PROCESS_ACCUMULATED, U6_ArchiveStorageConverter_ProcessAccumulatedData)
+        FUNC_CASE(UNITY6_ASSETBUNDLELOAD_FEEDSTREAM, U6_AssetBundleLoadFromStreamAsyncOperation_FeedStream)
+
+        FUNC_CASE(UNITY6_LOAD_FMOD_SOUND, U6_LoadFMODSound)
     }
 }
 

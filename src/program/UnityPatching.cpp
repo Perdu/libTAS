@@ -45,6 +45,11 @@ struct usig_t {
 
 const static usymbol_t UNITY_SYMBOLS[] = {
     {
+        UNITY_VERSION,
+        "UnityVersion::UnityVersion",
+        "_ZN12UnityVersionC2EPKc",
+    },
+    {
         UNITY4_JOBSCHEDULER_AWAKE,
         "JobScheduler::AwakeIdleWorkerThreads",
         "_ZN12JobScheduler22AwakeIdleWorkerThreadsEi",
@@ -261,6 +266,11 @@ const static usymbol_t UNITY_SYMBOLS[] = {
     },
     {
         UNITY6_UJOB_WAIT,
+        "ujob_wait_for",
+        "_Z13ujob_wait_forP14ujob_control_t13ujob_handle_ti",
+    },
+    {
+        UNITY6_UJOB_WAIT_ALL,
         "ujob_wait_all",
         "_Z13ujob_wait_allP14ujob_control_ti",
     },
@@ -268,6 +278,156 @@ const static usymbol_t UNITY_SYMBOLS[] = {
         UNITY6_WORKER_THREAD_ROUTINE,
         "worker_thread_routine",
         "_ZL21worker_thread_routinePv",
+    },
+    {
+        UNITY6_PRELOADMANAGER_ADD,
+        "PreloadManager::AddToQueue",
+        "_ZN14PreloadManager10AddToQueueEP23PreloadManagerOperation",
+    },
+    {
+        UNITY6_PRELOADMANAGER_PREPARE,
+        "PreloadManager::PrepareProcessingPreloadOperation",
+        "_ZN14PreloadManager33PrepareProcessingPreloadOperationEv",
+    },
+    {
+        UNITY6_PRELOADMANAGER_PROCESS,
+        "PreloadManager::ProcessSingleOperation",
+        "_ZN14PreloadManager22ProcessSingleOperationEv",
+    },
+    {
+        UNITY6_PRELOADMANAGER_UPDATE,
+        "PreloadManager::UpdatePreloading",
+        "_ZN14PreloadManager16UpdatePreloadingEv",
+    },
+    {
+        UNITY4_PRELOADMANAGER_UPDATE_STEP,
+        "PreloadManager::UpdatePreloadingSingleStep",
+        "_ZN14PreloadManager26UpdatePreloadingSingleStepEb.constprop.207",
+    },
+    {
+        UNITY6_PRELOADMANAGER_UPDATE_STEP,
+        "PreloadManager::UpdatePreloadingSingleStep",
+        "_ZN14PreloadManager26UpdatePreloadingSingleStepENS_21UpdatePreloadingFlagsEi",
+    },
+    {
+        UNITY6_PRELOADMANAGER_WAIT,
+        "PreloadManager::WaitForAllAsyncOperationsToComplete",
+        "_ZN14PreloadManager35WaitForAllAsyncOperationsToCompleteEv",
+    },
+    {
+        UNITY6_PRELOADMANAGER_RUN,
+        "PreloadManager::Run",
+        "_ZN14PreloadManager3RunEPv",
+    },
+    {
+        UNITY2K_PRELOADMANAGER_PEEK,
+        "PreloadManager::PeekIntegrateQueue",
+        "_ZN14PreloadManager18PeekIntegrateQueueEv",
+    },
+    {
+        UNITY2K_PRELOADMANAGER_IS_LOADING,
+        "PreloadManager::IsLoadingOrQueued",
+        "_ZN14PreloadManager17IsLoadingOrQueuedEv",
+    },
+    {
+        UNITY5_ASYNCREADMANAGER_WAIT_DONE,
+        "AsyncReadManagerThreaded::WaitDone",
+        "_ZN24AsyncReadManagerThreaded8WaitDoneEP16AsyncReadCommand",
+    },
+    {
+        UNITY6_ASYNCREADMANAGER_REQUEST,
+        "AsyncReadManagerThreaded::Request",
+        "_ZN24AsyncReadManagerThreaded7RequestEP16AsyncReadCommand",
+    },
+    {
+        UNITY2K_ASYNCREADMANAGER_SYNC_REQUEST,
+        "AsyncReadManagerThreaded::SyncRequest",
+        "_ZN24AsyncReadManagerThreaded11SyncRequestEP16AsyncReadCommand",
+    },
+    {
+        UNITY6_ASYNCREADMANAGER_OPENCOMPLETE_CALLBACK,
+        "AsyncReadManagerManaged::OpenCompleteCallback",
+        "_ZN23AsyncReadManagerManagedL20OpenCompleteCallbackER16AsyncReadCommandNS0_6StatusE",
+    },
+    {
+        UNITY6_ASYNCREADMANAGER_READCOMPLETE_CALLBACK,
+        "AsyncReadManagerManaged::ReadCompleteCallback",
+        "_ZN23AsyncReadManagerManagedL20ReadCompleteCallbackER16AsyncReadCommandNS0_6StatusE",
+    },
+    {
+        UNITY6_ASYNCREADMANAGER_CLOSECOMPLETE_CALLBACK,
+        "AsyncReadManagerManaged::CloseCompleteCallback",
+        "_ZN23AsyncReadManagerManagedL21CloseCompleteCallbackER16AsyncReadCommandNS0_6StatusE",
+    },
+    {
+        UNITY6_ASYNCREADMANAGER_CLOSECACHEDCOMPLETE_CALLBACK,
+        "AsyncReadManagerManaged::CloseCachedFileCompleteCallback",
+        "_ZN23AsyncReadManagerManagedL31CloseCachedFileCompleteCallbackER16AsyncReadCommandNS0_6StatusE",
+    },
+    {
+        UNITY6_ASYNCUPLOADMANAGER_ASYNC_READ_SUCCESS,
+        "AsyncUploadManager::AsyncReadSuccess",
+        "_ZN18AsyncUploadManager16AsyncReadSuccessER12AsyncCommand",
+    },
+    {
+        UNITY6_ASYNCUPLOADMANAGER_QUEUE_UPLOAD,
+        "AsyncUploadManager::QueueUploadAsset",
+        "_ZN18AsyncUploadManager16QueueUploadAssetEPKcN3VFS8FileSizeEjjRK18AsyncUploadHandlerRK12AssetContextPh13FileReadFlags",
+    },
+    {
+        UNITY6_ASYNCUPLOADMANAGER_ASYNC_RESOURCE_UPLOAD,
+        "AsyncUploadManager::AsyncResourceUpload",
+        "_ZN18AsyncUploadManager19AsyncResourceUploadER9GfxDeviceiRK26AsyncUploadManagerSettings",
+    },
+    {
+        UNITY6_ASYNCUPLOADMANAGER_ASYNC_READ_CALLBACK,
+        "AsyncUploadManager::AsyncReadCallbackStatic",
+        "_ZN18AsyncUploadManager23AsyncReadCallbackStaticER16AsyncReadCommandNS0_6StatusE",
+    },
+    {
+        UNITY6_ASYNCUPLOADMANAGER_SCHEDULE,
+        "AsyncUploadManager::ScheduleAsyncCommandsInternal",
+        "_ZN18AsyncUploadManager29ScheduleAsyncCommandsInternalEv",
+    },
+    {
+        UNITY6_ASYNCUPLOADMANAGER_CLOSE,
+        "AsyncUploadManager::CloseFile",
+        "_ZN18AsyncUploadManager9CloseFileERKN4core12basic_stringIcNS0_20StringStorageDefaultIcEEEE",
+    },
+    {
+        UNITY6_SIGNAL_CALLBACK,
+        "SignalCallback",
+        "_ZL14SignalCallbackR16AsyncReadCommandNS_6StatusE",
+    },
+    {
+        UNITY6_SYNC_READ,
+        "SyncReadRequest",
+        "_Z15SyncReadRequestP16AsyncReadCommand",
+    },
+    {
+        UNITY6_ARCHIVESTORAGECONVERTER_CONSTRUCTOR,
+        "ArchiveStorageConverter::ArchiveStorageConverter",
+        "_ZN23ArchiveStorageConverterC2EP32IArchiveStorageConverterListenerb",
+    },
+    {
+        UNITY6_ARCHIVESTORAGECONVERTER_PROCESS_ACCUMULATED,
+        "ArchiveStorageConverter::ProcessAccumulatedData",
+        "_ZN23ArchiveStorageConverter22ProcessAccumulatedDataEv",
+    },
+    {
+        UNITY6_ARCHIVESTORAGECONVERTER_PROCESS,
+        "ArchiveStorageConverter::ProcessData",
+        "_ZN23ArchiveStorageConverter11ProcessDataEPKvm",
+    },
+    {
+        UNITY6_ASSETBUNDLELOAD_FEEDSTREAM,
+        "AssetBundleLoadFromStreamAsyncOperation::FeedStream",
+        "_ZN39AssetBundleLoadFromStreamAsyncOperation10FeedStreamEPKvm",
+    },
+    {
+        UNITY6_LOAD_FMOD_SOUND,
+        "LoadFMODSound",
+        "_Z13LoadFMODSoundPPN11SoundHandle8InstanceEPKcjP10SampleClipjN3VFS8FileSizeEP22FMOD_CREATESOUNDEXINFO",
     },
     {
         UNITY_FUNCS_LEN,
@@ -284,6 +444,14 @@ const static usig_t UNITY_SIGNATURES_32[] = {
 };
 
 const static usig_t UNITY_SIGNATURES_64[] = {
+    {
+        UNITY_VERSION,
+        "53 48 8d 57 14 48 83 ec 50 64 48 8b 04 25 28 00 00 00 48 89 44 24 48",
+    },
+    {
+        UNITY_VERSION,
+        "41 56 53 48 81 ec 98 00 00 00 0f 57 c0 0f 11 07",
+    },
     {
         UNITY4_JOBSCHEDULER_FETCH,
         "41 54 55 48 89 F5 53 48 89 FB 48 83 EC 30 48 63 06 8B 57 7C 39 D0"
@@ -463,6 +631,102 @@ const static usig_t UNITY_SIGNATURES_64[] = {
     {
         UNITY6_WORKER_THREAD_ROUTINE,
         "41 57 41 56 53 49 89 FE 48 8B 5F 08 48 63 07"
+    },
+    {
+        UNITY6_PRELOADMANAGER_ADD,
+        "41 57 41 56 41 55 41 54 53 48 83 EC 10 49 89 F7 48 89 FB 4C 8D B7 70 01 00 00",
+    },
+    {
+        UNITY6_PRELOADMANAGER_UPDATE,
+        "55 41 57 41 56 41 54 53 48 83 ec 20 49 89 ff 4c 8d b7 70 01 00 00 4c 89 f7",
+    },
+    {
+        UNITY6_PRELOADMANAGER_UPDATE_STEP,
+        "55 41 57 41 56 41 55 41 54 53 48 83 ec 48 89 d3 41 89 f7 49 89 fd 80 7f 38 00",
+    },
+    {
+        UNITY6_PRELOADMANAGER_WAIT,
+        "55 41 57 41 56 41 55 41 54 53 48 83 ec 38 49 89 fd 8b 47 3c 89 44 24 2c 83 f8 04",
+    },
+    {
+        UNITY6_PRELOADMANAGER_RUN,
+        "55 41 57 41 56 41 55 41 54 53 48 81 ec 98 00 00 00 49 89 ff 48 8b af 58 03 00 00",
+    },
+    {
+        UNITY6_ASYNCREADMANAGER_REQUEST,
+        "41 57 41 56 41 55 41 54 53 48 83 ec 10 49 89 f7 49 89 fd c7 46 28 01 00 00 00",
+    },
+    {
+        UNITY6_ASYNCREADMANAGER_OPENCOMPLETE_CALLBACK,
+        "48 83 ec 18 48 8b 47 40 48 8b 88 b0 01 00 00 8b 90 b8 01 00 00",
+    },
+    {
+        UNITY6_ASYNCREADMANAGER_READCOMPLETE_CALLBACK,
+        "48 83 ec 18 48 8b 47 40 48 8b 88 18 01 00 00 8b 90 20 01 00 00",
+    },
+    {
+        UNITY6_ASYNCREADMANAGER_CLOSECOMPLETE_CALLBACK,
+        "41 56 53 48 83 ec 18 4c 8b 77 40 49 8b 86 c0 01 00 00",
+    },
+    {
+        UNITY6_ASYNCREADMANAGER_CLOSECACHEDCOMPLETE_CALLBACK,
+        "41 56 53 48 83 ec 18 4c 8b 77 40 49 8b 86 18 01 00 00",
+    },
+    {
+        UNITY6_ASYNCUPLOADMANAGER_ASYNC_READ_SUCCESS,
+        "41 57 41 56 41 55 41 54 53 48 83 ec 50 49 89 f5 49 89 fe 48 8b 46 60 48 85 c0",
+    },
+    {
+        UNITY6_ASYNCUPLOADMANAGER_QUEUE_UPLOAD,
+        "55 41 57 41 56 41 55 41 54 53 50 41 89 ca 49 89 d3 49 89 fe 48 8b bf 38 25 00 00",
+    },
+    {
+        UNITY6_ASYNCUPLOADMANAGER_ASYNC_RESOURCE_UPLOAD,
+        "55 41 57 41 56 41 55 41 54 53 48 83 ec 68 48 89 74 24 38 49 89 fe 48 8b 01 48 89 87 5c 25 00 00",
+    },
+    {
+        UNITY6_ASYNCUPLOADMANAGER_ASYNC_READ_CALLBACK,
+        "55 41 57 41 56 41 55 41 54 53 48 83 ec 38 41 89 f5 48 89 fb 4c 8b 35 ?? ?? ?? ?? 4c 8b 7f 40",
+    },
+    {
+        UNITY6_ASYNCUPLOADMANAGER_SCHEDULE,
+        "55 41 57 41 56 41 55 41 54 53 48 83 ec 58 49 89 fe 83 bf 5c 25 00 00 ff 0f 84 ?? ?? ?? ?? 4d 8b 7e 28 4d 85 ff",
+    },
+    {
+        UNITY6_ASYNCUPLOADMANAGER_CLOSE,
+        "55 41 57 41 56 41 55 41 54 53 48 81 ec a8 00 00 00 49 89 f7 8b 07 85 c0 0f 8e",
+    },
+    {
+        UNITY6_SIGNAL_CALLBACK,
+        "50 89 77 28 48 8b 77 40 ba 01 00 00 00 b8 01 00 00 00",
+    },
+    {
+        UNITY6_SYNC_READ,
+        "55 41 57 41 56 41 55 41 54 53 48 83 ec 28 49 89 fc 48 8b 2d ?? ?? ?? ?? 48 8d 9d e8 0a 00 00",
+    },
+    {
+        UNITY6_ARCHIVESTORAGECONVERTER_CONSTRUCTOR,
+        "55 41 57 41 56 41 54 53 48 83 ec 10 49 89 fe 48 89 37 0f 57 c0 0f 11 47 08",
+    },
+    {
+        UNITY6_ARCHIVESTORAGECONVERTER_CONSTRUCTOR,
+        "55 41 57 41 56 41 54 53 48 83 ec 10 49 89 d5 48 89 fb 48 89 37 0f 57 c0 0f 11 47 08",
+    },
+    {
+        UNITY6_ARCHIVESTORAGECONVERTER_PROCESS_ACCUMULATED,
+        "55 41 57 41 56 41 55 41 54 53 48 81 ec 38 0d 00 00 48 89 fb 80 7f 48 00 0f 84",
+    },
+    {
+        UNITY6_ARCHIVESTORAGECONVERTER_PROCESS,
+        "55 41 56 53 48 83 ec 10 48 89 d5 48 89 f1 48 89 fb 48 8b 7f 08 48 8b 43 10",
+    },
+    {
+        UNITY6_ASSETBUNDLELOAD_FEEDSTREAM,
+        "41 57 41 56 41 55 41 54 53 48 83 ec 10 83 bf c0 00 00 00 00 75 ?? 49 89 fd 48 83 bf 98 00 00 00 00",
+    },
+    {
+        UNITY6_LOAD_FMOD_SOUND,
+        "55 41 57 41 56 41 55 41 54 53 48 81 ec 78 02 00 00 89 54 24 18 48 85 ff 0f 84 ?? ?? ?? ?? 4c 89 cb",
     },
     {
         UNITY_FUNCS_LEN,

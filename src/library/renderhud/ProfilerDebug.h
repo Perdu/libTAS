@@ -17,43 +17,26 @@
     along with libTAS.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef LIBTAS_MOVIEFILECHANGELOG_H_INCLUDED
-#define LIBTAS_MOVIEFILECHANGELOG_H_INCLUDED
+#ifndef LIBTAS_IMGUI_PROFILERDEBUG_H_INCL
+#define LIBTAS_IMGUI_PROFILERDEBUG_H_INCL
 
-#include "../shared/inputs/AllInputs.h"
+#include "TimeHolder.h"
+#include "Profiler.h"
 
-#include "IMovieAction.h"
-
-#include <QtCore/QObject>
-#include <QtWidgets/QUndoStack>
-#include <list>
-#include <vector>
 #include <cstdint>
 
-struct Context;
+namespace libtas {
 
-class MovieFileChangeLog : public QUndoStack {
-    Q_OBJECT
-public:
-
-    /* Prepare a movie file from the context */
-    MovieFileChangeLog(Context* c);
-
-    bool undo();
-    bool redo();
-
-    void push(IMovieAction* action);
+namespace ProfilerDebug
+{
+    void nodeToPos(const TimeHolder& startTime, const TimeHolder& lengthTime, float available_size, float& lengthTimeMs, float& leftPos, float& lengthPos);
     
-private:
-    Context* context;
+    void renderFrame(int f, const TimeHolder& frame_start, const TimeHolder& frame_end, float available_start, float available_size);
+    void renderNode(int nodeId, const Profiler::Database* database, float available_start, float available_size);
 
-signals:
-    void updateChangeLog();
-    void historyToBeRemoved(int first_row, int last_row);
-    void historyRemoved();
-    void historyToBeInserted(int row);
-    void historyInserted();
+    void draw(uint64_t framecount, bool* p_open);
+}
 
-};
+}
 
 #endif
