@@ -144,9 +144,6 @@ struct Context {
     /* PID of the appimage process that mounts the appimage structure */
     pid_t appimage_pid = 0;
 
-    /* Link to the movie */
-    MovieFile* movie;
-    
     /* Detected game engine */
     int engine;
 };
