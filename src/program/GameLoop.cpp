@@ -722,7 +722,7 @@ void GameLoop::processInputs(AllInputs &ai)
 
 	    if (modified) {
 
-		movie->inputs->wasModified();
+		movie.inputs->wasModified();
 
 		if (context->config.sc.recording == SharedConfig::RECORDING_WRITE) {
 		    /* If the input editor is visible, we should keep future inputs.
@@ -777,7 +777,7 @@ void GameLoop::processInputs(AllInputs &ai)
                 Lua::Callbacks::call(Lua::NamedLuaFunction::CallbackInput);
                 if (modified) {
                     movie.inputs->setInputs(ai, true);
-		    movie->inputs->wasModified();
+		    movie.inputs->wasModified();
 		}
 
                 /* Update framerate */
@@ -818,7 +818,7 @@ void GameLoop::processInputs(AllInputs &ai)
                 Lua::Input::registerInputs(&ai, &modified);
                 Lua::Callbacks::call(Lua::NamedLuaFunction::CallbackInput);
 		if (modified)
-		    movie->inputs->wasModified();
+		    movie.inputs->wasModified();
             }
 
             /* Update controller inputs if controller window is shown */
