@@ -720,30 +720,31 @@ void GameLoop::processInputs(AllInputs &ai)
             Lua::Input::registerInputs(&ai, &modified);
             Lua::Callbacks::call(Lua::NamedLuaFunction::CallbackInput);
 
-            if (context->config.sc.recording == SharedConfig::RECORDING_WRITE) {
-                /* If the input editor is visible, we should keep future inputs.
-                 * If not, we truncate inputs if necessary.
-                 */
-                bool keep_inputs = false;
-                bool past_inputs = context->framecount < movie.inputs->nbFrames();
-                emit isInputEditorVisible(keep_inputs);
+	    if (modified) {
+		if (context->config.sc.recording == SharedConfig::RECORDING_WRITE) {
+		    /* If the input editor is visible, we should keep future inputs.
+		     * If not, we truncate inputs if necessary.
+		     */
+		    bool keep_inputs = false;
+		    bool past_inputs = context->framecount < movie.inputs->nbFrames();
+		    emit isInputEditorVisible(keep_inputs);
 
-                /* If some inputs are locked, copy the inputs from the movie.
-                 * Only do this if the input editor is opened, and if there are
-                 * inputs to copy. */
-                if (keep_inputs && past_inputs)
-                    movie.setLockedInputs(ai);
+		    /* If some inputs are locked, copy the inputs from the movie.
+		     * Only do this if the input editor is opened, and if there are
+		     * inputs to copy. */
+		    if (keep_inputs && past_inputs)
+			movie.setLockedInputs(ai);
 
-                /* Save inputs to moviefile */
-		if (modified)
+		    /* Save inputs to moviefile */
 		    movie.inputs->setInputs(ai, keep_inputs);
 
-                AutoSave::update(context, movie);
-            }
-            else {
-                /* Just save the inputs into the backup movie */
-                movie.inputs->setInputs(ai, false);
-            }
+		    AutoSave::update(context, movie);
+		}
+		else {
+		    /* Just save the inputs into the backup movie */
+		    movie.inputs->setInputs(ai, false);
+		}
+	    }
             break;
 
         case SharedConfig::RECORDING_READ:
@@ -765,9 +766,9 @@ void GameLoop::processInputs(AllInputs &ai)
                 }
             }
 
+	    bool modified;
             if (context->framecount < moviecount) { // movie has inputs for current frame
                 ai = movie.inputs->getInputs();
-		bool modified;
 
                 /* Allow lua to modify movie inputs even in playback mode */
                 Lua::Input::registerInputs(&ai, &modified);
@@ -808,7 +809,6 @@ void GameLoop::processInputs(AllInputs &ai)
             }
             else {
                 ai.clear();
-		bool modified;
 
                 /* Allow lua to modify inputs past the end of the movie */
                 Lua::Input::registerInputs(&ai, &modified);
@@ -822,7 +822,8 @@ void GameLoop::processInputs(AllInputs &ai)
                 }
             }
 
-            AutoSave::update(context, movie);
+	    if (modified)
+		AutoSave::update(context, movie);
             break;
     }
     
