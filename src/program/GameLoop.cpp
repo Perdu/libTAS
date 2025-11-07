@@ -653,6 +653,7 @@ void GameLoop::sleepSendPreview()
 
 void GameLoop::processInputs(AllInputs &ai)
 {
+    bool modified = false;
     ai.clear();
 
     /* Don't record inputs if we are quitting */
@@ -716,10 +717,13 @@ void GameLoop::processInputs(AllInputs &ai)
             }
 
             /* Call lua onInput() here so that a script can modify inputs */
-            Lua::Input::registerInputs(&ai, &movie.inputs->modifiedSinceLastSave);
+            Lua::Input::registerInputs(&ai, &modified);
             Lua::Callbacks::call(Lua::NamedLuaFunction::CallbackInput);
 
-	    if (movie.inputs->modifiedSinceLastSave) {
+	    if (modified) {
+
+		movie->inputs->wasModified();
+
 		if (context->config.sc.recording == SharedConfig::RECORDING_WRITE) {
 		    /* If the input editor is visible, we should keep future inputs.
 		     * If not, we truncate inputs if necessary.
@@ -769,10 +773,12 @@ void GameLoop::processInputs(AllInputs &ai)
                 ai = movie.inputs->getInputs();
 
                 /* Allow lua to modify movie inputs even in playback mode */
-                Lua::Input::registerInputs(&ai, &movie.inputs->modifiedSinceLastSave);
+                Lua::Input::registerInputs(&ai, &modified);
                 Lua::Callbacks::call(Lua::NamedLuaFunction::CallbackInput);
-                if (movie.inputs->modifiedSinceLastSave)
+                if (modified) {
                     movie.inputs->setInputs(ai, true);
+		    movie->inputs->wasModified();
+		}
 
                 /* Update framerate */
                 uint32_t new_framerate_num = 0;
@@ -809,8 +815,10 @@ void GameLoop::processInputs(AllInputs &ai)
                 ai.clear();
 
                 /* Allow lua to modify inputs past the end of the movie */
-                Lua::Input::registerInputs(&ai, &movie.inputs->modifiedSinceLastSave);
+                Lua::Input::registerInputs(&ai, &modified);
                 Lua::Callbacks::call(Lua::NamedLuaFunction::CallbackInput);
+		if (modified)
+		    movie->inputs->wasModified();
             }
 
             /* Update controller inputs if controller window is shown */
@@ -820,8 +828,7 @@ void GameLoop::processInputs(AllInputs &ai)
                 }
             }
 
-	    if (movie.inputs->modifiedSinceLastSave)
-		AutoSave::update(context, movie);
+	    AutoSave::update(context, movie);
             break;
     }
     

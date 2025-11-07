@@ -64,6 +64,7 @@ void Lua::Input::registerInputs(AllInputs* frame_ai, bool* frame_modified)
 {
     ai = frame_ai;
     modified = frame_modified;
+    *modified = false;
 }
 
 int Lua::Input::clear(lua_State *L)
