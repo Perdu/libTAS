@@ -714,9 +714,10 @@ void GameLoop::processInputs(AllInputs &ai)
                 ai.misc->realtime_sec = context->new_realtime_sec;
                 ai.misc->realtime_nsec = context->new_realtime_nsec;
             }
+	    bool modified;
 
             /* Call lua onInput() here so that a script can modify inputs */
-            Lua::Input::registerInputs(&ai);
+            Lua::Input::registerInputs(&ai, &modified);
             Lua::Callbacks::call(Lua::NamedLuaFunction::CallbackInput);
 
             if (context->config.sc.recording == SharedConfig::RECORDING_WRITE) {
@@ -734,7 +735,8 @@ void GameLoop::processInputs(AllInputs &ai)
                     movie.setLockedInputs(ai);
 
                 /* Save inputs to moviefile */
-                movie.inputs->setInputs(ai, keep_inputs);
+		if (modified)
+		    movie.inputs->setInputs(ai, keep_inputs);
 
                 AutoSave::update(context, movie);
             }
@@ -765,11 +767,12 @@ void GameLoop::processInputs(AllInputs &ai)
 
             if (context->framecount < moviecount) { // movie has inputs for current frame
                 ai = movie.inputs->getInputs();
+		bool modified;
 
                 /* Allow lua to modify movie inputs even in playback mode */
-                Lua::Input::registerInputs(&ai);
-                bool movieMayBeModifed = Lua::Callbacks::call(Lua::NamedLuaFunction::CallbackInput);
-                if (movieMayBeModifed)
+                Lua::Input::registerInputs(&ai, &modified);
+                Lua::Callbacks::call(Lua::NamedLuaFunction::CallbackInput);
+                if (modified)
                     movie.inputs->setInputs(ai, true);
 
                 /* Update framerate */
@@ -805,9 +808,10 @@ void GameLoop::processInputs(AllInputs &ai)
             }
             else {
                 ai.clear();
+		bool modified;
 
                 /* Allow lua to modify inputs past the end of the movie */
-                Lua::Input::registerInputs(&ai);
+                Lua::Input::registerInputs(&ai, &modified);
                 Lua::Callbacks::call(Lua::NamedLuaFunction::CallbackInput);
             }
 
