@@ -653,6 +653,7 @@ void GameLoop::sleepSendPreview()
 
 void GameLoop::processInputs(AllInputs &ai)
 {
+    bool modified;
     ai.clear();
 
     /* Don't record inputs if we are quitting */
@@ -714,7 +715,6 @@ void GameLoop::processInputs(AllInputs &ai)
                 ai.misc->realtime_sec = context->new_realtime_sec;
                 ai.misc->realtime_nsec = context->new_realtime_nsec;
             }
-	    bool modified;
 
             /* Call lua onInput() here so that a script can modify inputs */
             Lua::Input::registerInputs(&ai, &modified);
@@ -766,7 +766,6 @@ void GameLoop::processInputs(AllInputs &ai)
                 }
             }
 
-	    bool modified;
             if (context->framecount < moviecount) { // movie has inputs for current frame
                 ai = movie.inputs->getInputs();
 
