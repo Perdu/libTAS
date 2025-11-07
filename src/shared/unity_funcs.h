@@ -43,7 +43,10 @@ enum {
     UNITY5_JOBQUEUE_SCHEDULE_GROUP, // JobQueue::ScheduleGroup(JobGroup*, JobQueue::JobQueuePriority)
     UNITY5_JOBQUEUE_SCHEDULE_GROUPS, // JobQueue::ScheduleGroups(JobGroup*, JobGroup*)
     UNITY5_JOBQUEUE_SCHEDULE_JOB, // JobQueue::ScheduleJob(void (*)(void*), void*, JobGroupID, JobQueue::JobQueuePriority)
+    UNITY5_JOBQUEUE_SCHEDULE_JOB_MULTIPLE, // JobQueue::ScheduleJobMultipleDependencies(void (*)(void*), void*, JobGroupID*, int)
     UNITY5_JOBQUEUE_WAIT_JOB_GROUP, // JobQueue::WaitForJobGroup(JobGroupID, bool)
+    UNITY5_JOBQUEUE_WAIT_JOB_GROUP_ID, // JobQueue::WaitForJobGroupID(JobGroupID)
+    UNITY5_JOBQUEUE_HAS_JOB_COMPLETED, // JobQueue::HasJobGroupIDCompleted(JobGroupID)
     UNITY2K_BACKGROUND_JOBQUEUE_SCHEDULE, // BackgroundJobQueue::ScheduleJobInternal(void (*)(void*), void*, BackgroundJobQueue::JobFence const&, JobQueue::JobQueuePriority)
     UNITY2K_BACKGROUND_JOBQUEUE_SCHEDULE_MAIN, // BackgroundJobQueue::ScheduleMainThreadJobInternal(void (*)(void*), void*)
     UNITY2K_JOBQUEUE_COMPLETE_ALL_JOBS, // JobQueue::CompleteAllJobs()
@@ -99,6 +102,7 @@ enum {
     UNITY6_ARCHIVESTORAGECONVERTER_PROCESS, // ArchiveStorageConverter::ProcessData(void const*, unsigned long)
     UNITY6_ASSETBUNDLELOAD_FEEDSTREAM, // AssetBundleLoadFromStreamAsyncOperation::FeedStream(void const*, unsigned long)
     UNITY6_LOAD_FMOD_SOUND, // LoadFMODSound(SoundHandle::Instance**, char const*, unsigned int, SampleClip*, unsigned int, VFS::FileSize, FMOD_CREATESOUNDEXINFO*)
+    UNITY5_ANALYTICS_UPDATE, // BaseUnityAnalytics::UpdateConfigFromServer()
     UNITY_FUNCS_LEN
 };
 

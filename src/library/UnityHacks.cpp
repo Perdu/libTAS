@@ -79,7 +79,14 @@ typedef void ujob_job_t;
 typedef long ujob_handle_t;
 typedef void ujob_dependency_chain;
 typedef int WorkStealingRange;
-typedef void* (*JobsCallbackFunctions)(void*, int);
+
+struct JobsCallbackFunctions {
+    void (*execute)(void*, int);
+    void (*completed)(void*);
+};
+
+// typedef void (*JobsCallbackFunctions)(void*);
+// typedef void (*JobsCallbackFunctionsParallel)(void*, int);
 typedef void ScriptingBackendNativeObjectPtrOpaque;
 class JobScheduleParameters;
 class JobFence;
@@ -219,9 +226,13 @@ namespace orig {
     long (*U5_JobQueue_Pop)(JobQueue* t, JobGroupID x) = nullptr;
     long (*U5_JobQueue_ProcessJobs)(JobQueue* x, void* y) = nullptr;
     void (*U5_JobQueue_ScheduleJob)(JobQueue *t, void (*func)(void*), void* arg, JobGroup* z, int a, int b) = nullptr;
+    JobGroupID (*U5_JobQueue_ScheduleJobMultipleDependencies)(JobQueue *t, void* func, void* arg, JobGroupID* x, int y) = nullptr;
     JobGroupID (*U5_JobQueue_ScheduleGroup)(JobQueue *t, JobGroup* x, int y) = nullptr;
     void (*U5_JobQueue_ScheduleGroups)(JobQueue *t, JobGroup* x, JobGroup* y) = nullptr;
     void (*U5_JobQueue_WaitForJobGroup)(JobQueue* t, JobGroup* x, int y, bool z) = nullptr;
+    void (*U5_JobQueue_WaitForJobGroupID)(JobQueue* t, JobGroup* x, int y) = nullptr;
+    bool (*U5_JobQueue_HasJobGroupIDCompleted)(JobQueue* t, JobGroup* x, int y) = nullptr;
+
 
     void (*U2K_BackgroundJobQueue_ScheduleJobInternal)(BackgroundJobQueue *t, void (*x)(void*), void* y, BackgroundJobQueue_JobFence* z, JobQueue_JobQueuePriority a) = nullptr;
     void (*U2K_BackgroundJobQueue_ScheduleMainThreadJobInternal)(BackgroundJobQueue *t, void (*x)(void*), void* y) = nullptr;
@@ -279,6 +290,8 @@ namespace orig {
     int (*U6_ArchiveStorageConverter_ProcessAccumulatedData)(ArchiveStorageConverter* c) = nullptr;
     int (*U6_AssetBundleLoadFromStreamAsyncOperation_FeedStream)(AssetBundleLoadFromStreamAsyncOperation *o, void const* x, unsigned long y) = nullptr;
     int (*U6_LoadFMODSound)(SoundHandle_Instance** si, char const* s, unsigned int f, SampleClip* c, unsigned int i, VFS_FileSize fs, FMOD_CREATESOUNDEXINFO* in) = nullptr;
+
+    void (*U5_BaseUnityAnalytics_UpdateConfigFromServer)(void* a) = nullptr;
 }
 
 #include <signal.h>
@@ -434,9 +447,9 @@ static long U5_JobQueue_Exec(JobQueue* t, JobInfo* x, long long y, int z)
 
 static long U5_JobQueue_ExecuteJobFromQueue(JobQueue* t)
 {
-    LOGTRACE(LCF_HACKS);
-    if (Global::shared_config.game_specific_sync & SharedConfig::GC_SYNC_UNITY_JOBS)
-        return 0;
+    // LOGTRACE(LCF_HACKS);
+    // if (Global::shared_config.game_specific_sync & SharedConfig::GC_SYNC_UNITY_JOBS)
+    //     return 0;
     
     return orig::U5_JobQueue_ExecuteJobFromQueue(t);
 }
@@ -466,19 +479,19 @@ static long U5_JobQueue_ProcessJobs(JobQueue* t, void* x)
     ThreadInfo* thread = ThreadManager::getCurrentThread();
     thread->unityThread = true;
 
-    if (Global::shared_config.game_specific_sync & SharedConfig::GC_SYNC_UNITY_JOBS) {
-        /* Calling U5_JobQueue_ProcessJobs() in worker threads may call
-         * U5_JobQueue_Exec() directly without fetching a job queue with 
-         * U5_JobQueue_ExecuteJobFromQueue(), so we wait indefinitively here.
-         * To call jobs pushed in this worker thread, we will use the WorkerSteal
-         * feature elsewhere.
-         */
-        if (!ThreadManager::isMainThread()) {
-            while (!Global::is_exiting) {
-                NATIVECALL(sleep(1));
-            }
-        }
-    }
+    // if (Global::shared_config.game_specific_sync & SharedConfig::GC_SYNC_UNITY_JOBS) {
+    //     /* Calling U5_JobQueue_ProcessJobs() in worker threads may call
+    //      * U5_JobQueue_Exec() directly without fetching a job queue with 
+    //      * U5_JobQueue_ExecuteJobFromQueue(), so we wait indefinitively here.
+    //      * To call jobs pushed in this worker thread, we will use the WorkerSteal
+    //      * feature elsewhere.
+    //      */
+    //     if (!ThreadManager::isMainThread()) {
+    //         while (!Global::is_exiting) {
+    //             NATIVECALL(sleep(1));
+    //         }
+    //     }
+    // }
 
     return orig::U5_JobQueue_ProcessJobs(t, x);
 }
@@ -499,9 +512,57 @@ static JobGroupID U5_JobQueue_ScheduleGroup(JobQueue *t, JobGroup* x, int y)
     LOG(LL_DEBUG, LCF_HACKS, "    returns JobGroup %p and JobGroup tag %d", j.group, j.tag);
 
     if (Global::shared_config.game_specific_sync & SharedConfig::GC_SYNC_UNITY_JOBS) {
-        /* Immediatly wait for the job */
-        if (orig::U5_JobQueue_WaitForJobGroup)
-            orig::U5_JobQueue_WaitForJobGroup(t, j.group, j.tag, true);
+        /* Try waiting for the job */
+        if (orig::U5_JobQueue_HasJobGroupIDCompleted) {
+
+            bool has_completed = false;
+            for (int i = 0; i < 100; i++) {
+                if (orig::U5_JobQueue_HasJobGroupIDCompleted(t, j.group, j.tag)) {
+                    has_completed = true;
+                    break;
+                }
+                NATIVECALL(usleep(100));
+            }
+            if (!has_completed)
+                LOG(LL_WARN, LCF_HACKS, "    We could not wait for job group %p/%d to finish...", j.group, j.tag);
+        }
+        
+        // if (orig::U5_JobQueue_WaitForJobGroup)
+        //     orig::U5_JobQueue_WaitForJobGroup(t, j.group, j.tag, true);
+        // else if (orig::U5_JobQueue_WaitForJobGroupID)
+        //     orig::U5_JobQueue_WaitForJobGroupID(t, j.group, j.tag);
+    }
+
+    return j;
+}
+
+static JobGroupID U5_JobQueue_ScheduleJobMultipleDependencies(JobQueue *t, void* func, void* arg, JobGroupID* x, int y)
+{
+    LOGTRACE(LCF_HACKS);
+    /* Return value is 16 bytes (accross registers RDX:RAX), so we need to use
+     * a 16-byte struct to recover it. */
+    JobGroupID j = orig::U5_JobQueue_ScheduleJobMultipleDependencies(t, func, arg, x, y);
+
+    if (Global::shared_config.game_specific_sync & SharedConfig::GC_SYNC_UNITY_JOBS) {
+        /* Try waiting for the job */
+        if (orig::U5_JobQueue_HasJobGroupIDCompleted) {
+
+            bool has_completed = false;
+            for (int i = 0; i < 100; i++) {
+                if (orig::U5_JobQueue_HasJobGroupIDCompleted(t, j.group, j.tag)) {
+                    has_completed = true;
+                    break;
+                }
+                NATIVECALL(usleep(100));
+            }
+            if (!has_completed)
+                LOG(LL_WARN, LCF_HACKS, "    We could not wait for job group %p/%d to finish...", j.group, j.tag);
+        }
+        
+        // if (orig::U5_JobQueue_WaitForJobGroup)
+        //     orig::U5_JobQueue_WaitForJobGroup(t, j.group, j.tag, true);
+        // else if (orig::U5_JobQueue_WaitForJobGroupID)
+        //     orig::U5_JobQueue_WaitForJobGroupID(t, j.group, j.tag);
     }
 
     return j;
@@ -517,6 +578,18 @@ static void U5_JobQueue_WaitForJobGroup(JobQueue* t, JobGroup* x, int y, bool z)
 {
     LOG(LL_TRACE, LCF_HACKS, "U5_JobQueue_WaitForJobGroup called with JobGroup %p, JobGroup tag %d and steal mode %d", x, y, z);
     return orig::U5_JobQueue_WaitForJobGroup(t, x, y, z);
+}
+
+static void U5_JobQueue_WaitForJobGroupID(JobQueue* t, JobGroup* x, int y)
+{
+    LOG(LL_TRACE, LCF_HACKS, "U5_JobQueue_WaitForJobGroupID called with JobGroup %p, JobGroup tag %d", x, y);
+    return orig::U5_JobQueue_WaitForJobGroupID(t, x, y);
+}
+
+static bool U5_JobQueue_HasJobGroupIDCompleted(JobQueue* t, JobGroup* x, int y)
+{
+    LOG(LL_TRACE, LCF_HACKS, "U5_JobQueue_WaitForJobGroupID called with JobGroup %p, JobGroup tag %d", x, y);
+    return orig::U5_JobQueue_HasJobGroupIDCompleted(t, x, y);
 }
 
 static void U2K_BackgroundJobQueue_ScheduleJobInternal(BackgroundJobQueue *t, void (*x)(void*), void* y, BackgroundJobQueue_JobFence* z, JobQueue_JobQueuePriority a)
@@ -681,15 +754,33 @@ static unsigned long U6_ujob_schedule_job_internal(ujob_control_t* x, ujob_handl
 }
 
 struct callback_args_t {
-    JobsCallbackFunctions* func;
+    int count;
+    JobsCallbackFunctions funcs;
     void* arg;
-    int loop_index;
+    // std::mutex mutex;
+    // std::condition_variable cv;
+    // bool completed;
 };
 
-static void* job_callback(void* arg, int)
+static void job_callback_execute(void* arg, int)
 {
     callback_args_t* args = reinterpret_cast<callback_args_t*>(arg);
-    return (*args->func)(args->arg, args->loop_index);
+
+    /* Perform all iterations of the loop inside this job */
+    for (int i = 0; i < args->count; i++)
+        args->funcs.execute(args->arg, i);
+}
+
+static void job_callback_completed(void* arg)
+{
+    callback_args_t* args = reinterpret_cast<callback_args_t*>(arg);
+    if (args->funcs.completed) {
+        args->funcs.completed(args->arg);
+    }
+
+    // std::unique_lock<std::mutex> lock(args->mutex);
+    // args->completed = true;
+    // args->cv.notify_all();
 }
 
 /* The function parameters from the symbol are *wrong*! 6th parameter must be 
@@ -703,50 +794,42 @@ static void* job_callback(void* arg, int)
  */ 
 static ujob_handle_t U6_ujob_schedule_parallel_for_internal(ujob_control_t* x, JobsCallbackFunctions* y, void* job_callback_arg, WorkStealingRange* a, unsigned int count, unsigned long c, ujob_handle_t const* d, long e)
 {
-    LOG(LL_TRACE, LCF_HACKS, "U6_ujob_schedule_parallel_for_internal called with callback %p, steal mode %d, unknown uint %d", *y, a?(*a):0, count);
+    LOG(LL_TRACE, LCF_HACKS, "U6_ujob_schedule_parallel_for_internal called with callback args %p , steal mode %d, count %d, ujob_handle_t %p", job_callback_arg, a?(*a):0, count, d);
 
     if (!(Global::shared_config.game_specific_sync & SharedConfig::GC_SYNC_UNITY_JOBS))
         return orig::U6_ujob_schedule_parallel_for_internal(x, y, job_callback_arg, a, count, c, d, e);
 
     ujob_handle_t ret = 0;
-    static JobsCallbackFunctions loop_callback = &job_callback;
+    static JobsCallbackFunctions loop_callbacks = {&job_callback_execute, job_callback_completed};
+    /* Instead of scheduling all the jobs in one call, we schedule one
+     * individual job that will perform all the iterations in order. The job may still
+     * run on a worker thread, but it should be fine for determinism.
+     * Normally, the job callback function is receiving the loop index as 
+     * second argument, so we pass our own callback function, which receives
+     * the original callback, the original callback argument, and the iteration 
+     * count. */
+    callback_args_t* args = new callback_args_t;
+    args->count = count;
+    args->funcs.execute = y->execute;
+    args->funcs.completed = y->completed;
+    args->arg = job_callback_arg;
+    // args->completed = false;
+    
+    // std::unique_lock<std::mutex> lock(args->mutex);
+    
+    ret = orig::U6_ujob_schedule_parallel_for_internal(x, &loop_callbacks, args, a, 1, c, d, e);
 
-    if (count == 1) {
-        ret = orig::U6_ujob_schedule_parallel_for_internal(x, y, job_callback_arg, a, count, c, d, e);
-        
-        /* In newer Unity 6 versions, there is a dedicated internal function for
-         * waiting on a job */
-        if (orig::U6_ujob_wait_for)
-            orig::U6_ujob_wait_for(x, ret, 1);
-        else if (orig::U2K_JobQueue_WaitForJobGroupID)
-            orig::U2K_JobQueue_WaitForJobGroupID(reinterpret_cast<JobQueue*>(x), reinterpret_cast<JobGroup*>(ret), 0, true);
-    }
-    else {
-        /* Instead of scheduling all the jobs in one call, we schedule each
-         * individual job and wait for the job to complete. The job may still
-         * run on a worker thread, but it should be fine for determinism.
-         * Normally, the job callback function is receiving the loop index as 
-         * second argument, so we pass our own callback function, which receives
-         * the original callback, the original callback argument, and the loop
-         * index.
-         */
-        for (int i=0; i < count; i++) {
-            callback_args_t* args = new callback_args_t;
-            args->func = y;
-            args->arg = job_callback_arg;
-            args->loop_index = i;
-            
-            ret = orig::U6_ujob_schedule_parallel_for_internal(x, &loop_callback, args, a, 1, c, d, e);
-            
-            if (orig::U6_ujob_wait_for)
-                orig::U6_ujob_wait_for(x, ret, 1);
-            else if (orig::U2K_JobQueue_WaitForJobGroupID)
-                orig::U2K_JobQueue_WaitForJobGroupID(reinterpret_cast<JobQueue*>(x), reinterpret_cast<JobGroup*>(ret), 0, true);
+    /* Manually waiting on all jobs to execute */
+    // args->cv.wait(lock, [&args] { return args->completed; });
 
-            /* It should be safe to delete our custom callback argument here */
-            delete args;
-        }
-    }
+    if (orig::U6_ujob_wait_for)
+        orig::U6_ujob_wait_for(x, ret, 1);
+    else if (orig::U2K_JobQueue_WaitForJobGroupID)
+        orig::U2K_JobQueue_WaitForJobGroupID(reinterpret_cast<JobQueue*>(x), reinterpret_cast<JobGroup*>(ret), 0, true);
+
+    /* It should be safe to delete our custom callback argument here */
+    // delete args->loop_index;
+    delete args;
 
     return ret;
 }
@@ -1265,6 +1348,12 @@ static int U6_LoadFMODSound(SoundHandle_Instance** si, char const* s, unsigned i
     return orig::U6_LoadFMODSound(si, s, f, c, i, fs, in);
 }
 
+static void U5_BaseUnityAnalytics_UpdateConfigFromServer(void* a)
+{
+    LOGTRACE(LCF_HACKS);
+    // return orig::U5_BaseUnityAnalytics_UpdateConfigFromServer(a);
+}
+
 #define FUNC_CASE(FUNC_ENUM, FUNC_SYMBOL) \
 case FUNC_ENUM: \
     hook_patch_addr(reinterpret_cast<void*>(address), reinterpret_cast<void**>(&orig::FUNC_SYMBOL), reinterpret_cast<void*>(FUNC_SYMBOL)); \
@@ -1298,9 +1387,12 @@ void UnityHacks::patch(int func, uint64_t addr)
         FUNC_CASE(UNITY5_JOBQUEUE_POP, U5_JobQueue_Pop)
         FUNC_CASE(UNITY5_JOBQUEUE_PROCESS, U5_JobQueue_ProcessJobs)
         FUNC_CASE(UNITY5_JOBQUEUE_SCHEDULE_JOB, U5_JobQueue_ScheduleJob)
+        FUNC_CASE(UNITY5_JOBQUEUE_SCHEDULE_JOB_MULTIPLE, U5_JobQueue_ScheduleJobMultipleDependencies)
         FUNC_CASE(UNITY5_JOBQUEUE_SCHEDULE_GROUP, U5_JobQueue_ScheduleGroup)
         FUNC_CASE(UNITY5_JOBQUEUE_SCHEDULE_GROUPS, U5_JobQueue_ScheduleGroups)
         FUNC_CASE(UNITY5_JOBQUEUE_WAIT_JOB_GROUP, U5_JobQueue_WaitForJobGroup)
+        FUNC_CASE(UNITY5_JOBQUEUE_WAIT_JOB_GROUP_ID, U5_JobQueue_WaitForJobGroupID)
+        FUNC_CASE(UNITY5_JOBQUEUE_HAS_JOB_COMPLETED, U5_JobQueue_HasJobGroupIDCompleted)
         
         FUNC_CASE(UNITY2K_BACKGROUND_JOBQUEUE_SCHEDULE, U2K_BackgroundJobQueue_ScheduleJobInternal)
         FUNC_CASE(UNITY2K_BACKGROUND_JOBQUEUE_SCHEDULE_MAIN, U2K_BackgroundJobQueue_ScheduleMainThreadJobInternal)
@@ -1359,6 +1451,8 @@ void UnityHacks::patch(int func, uint64_t addr)
         FUNC_CASE(UNITY6_ASSETBUNDLELOAD_FEEDSTREAM, U6_AssetBundleLoadFromStreamAsyncOperation_FeedStream)
 
         FUNC_CASE(UNITY6_LOAD_FMOD_SOUND, U6_LoadFMODSound)
+        FUNC_CASE(UNITY5_ANALYTICS_UPDATE, U5_BaseUnityAnalytics_UpdateConfigFromServer)
+        
     }
 }
 
