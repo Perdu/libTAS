@@ -527,7 +527,6 @@ Display a simple text on top of the game:
 
     local memx = ""
     local x_position_frame_10 = 580
-    local x_position_frame_12 = 578
 
     function onFrame()
        local f = movie.currentFrame()
