@@ -111,11 +111,14 @@ __attribute__((target("avx2"))) uint8_t* SigSearch::FindAVX2(uint8_t* data, size
     const __m256i first = _mm256_set1_epi8(pat[0]);
     const __m256i last = _mm256_set1_epi8(pat[patLen1]);
 
+    // We must be able to load a full m256i value, so we skip the last bytes
+    size_t i;
+
     if (!hasWildcards) {
         // A little faster without wildcards
 
         // Scan 32 bytes at the time..
-        for (size_t i = 0; i < size; i += 32) {
+        for (i = 0; i < (size-32); i += 32) {
             // Load in the next 32 bytes of input first and last
             // Can use align 32 bit read for first since the input is page aligned
             const __m256i block_first = _mm256_load_si256((const __m256i*) (data + i));
@@ -142,7 +145,8 @@ __attribute__((target("avx2"))) uint8_t* SigSearch::FindAVX2(uint8_t* data, size
         // Pattern scan with wildcards mask
         const uint8_t *msk = sig.mask.data();
 
-        for (size_t i = 0; i < size; i += 32) {
+        // We must be able to load a full m256i value, so skip the last bytes
+        for (i = 0; i < (size-32); i += 32) {
             const __m256i block_first = _mm256_load_si256((const __m256i*) (data + i));
             const __m256i block_last = _mm256_loadu_si256((const __m256i*) (data + i + patLen1));
 
@@ -162,7 +166,8 @@ __attribute__((target("avx2"))) uint8_t* SigSearch::FindAVX2(uint8_t* data, size
         }
     }
 
-    return nullptr;
+    // Search the last bytes without AVX2
+    return SigSearch::FindCommon(data + i, size - i, sig, hasWildcards);
 }
 
 
@@ -206,7 +211,7 @@ uint8_t* SigSearch::FindCommon(uint8_t* input, size_t inputLen, const Signature 
                 const uint8_t *memPtr = ptr+1;
                 bool found = true;
 
-                for (int i = 0; (i < sigLen-2) && (memPtr < end); ++mskPtr, ++patPtr, ++memPtr, i++) {
+                for (size_t i = 0; (i < sigLen-2) && (memPtr < end); ++mskPtr, ++patPtr, ++memPtr, i++) {
                     if (!*mskPtr)
                         continue;
 
