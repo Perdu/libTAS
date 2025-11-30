@@ -322,6 +322,12 @@ Insert frame at current position
 
 Insert `nb_frame` frames at current position
 
+#### movie.getMovieFileName
+
+    String movie.getMovieFileName()
+
+Returns the full name of the movie file (.ltm).
+
 ### Runtime functions
 
 Runtime functions must be performed in callback `onFrame()` to be effective on

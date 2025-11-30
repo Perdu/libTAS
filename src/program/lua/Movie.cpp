@@ -45,6 +45,7 @@ static const luaL_Reg movie_functions[] =
     { "setMarker", Lua::Movie::setMarker},
     { "insertFrame", Lua::Movie::insertFrame},
     { "insertFrames", Lua::Movie::insertFrames},
+    { "getMovieFileName", Lua::Movie::getMovieFileName},
     { NULL, NULL }
 };
 
@@ -135,4 +136,10 @@ int Lua::Movie::insertFrames(lua_State *L)
     MovieActionInsertFrames action(context->framecount, n, movie->inputs);
     action.redo();
     return 0;
+}
+
+int Lua::Movie::getMovieFileName(lua_State *L)
+{
+    lua_pushstring(L, context->config.moviefile.c_str());
+    return 1;
 }

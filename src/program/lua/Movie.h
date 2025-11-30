@@ -69,6 +69,10 @@ namespace Movie {
 
     /* Insert n frames at current position */
     int insertFrames(lua_State *L);
+
+    /* Get filename of the movie file (.ltm) */
+    int getMovieFileName(lua_State *L);
+
 }
 }
 
