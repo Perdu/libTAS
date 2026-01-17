@@ -131,7 +131,7 @@ int SaveState::load(Context* context, const MovieFile& m, bool branch, bool inpu
             return ENOSTATEMOVIEPREFIX;
         } else if (movie->inputs->nbFrames() > 0) {
             sendMessage(MSGN_OSD_MSG);
-            sendString("Cannot load inputs from this savestate as earlier inputs mismatch");
+            sendString(std::string("Cannot load inputs from this savestate as earlier inputs mismatch"));
             return ESAVESTATEINPUTMISMATCH;
         } else {
             sendMessage(MSGN_OSD_MSG);
