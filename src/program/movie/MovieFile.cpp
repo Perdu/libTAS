@@ -204,11 +204,6 @@ int MovieFile::saveMovie(const std::string& moviefile, uint64_t nb_frames)
     annotations->save();
     editor->save();
 
-    std::vector<std::string> savestate_inputFiles = {
-        "inputs1", "inputs2", "inputs3", "inputs4", "inputs5",
-        "inputs6", "inputs7", "inputs8", "inputs9", "inputs10"
-    };
-
     /* Build the tar command */
     std::ostringstream oss;
     oss << "tar -czUf \"";
@@ -217,10 +212,10 @@ int MovieFile::saveMovie(const std::string& moviefile, uint64_t nb_frames)
     oss << context->config.tempmoviedir;
     oss << " inputs config.ini editor.ini annotations.txt";
     // Add only savestate input files that exist
-    for (const auto& f : savestate_inputFiles) {
-        std::filesystem::path p = std::filesystem::path(context->config.tempmoviedir) / f;
+    for (int i = 1; i <= 10; i++) {
+        std::filesystem::path p = std::filesystem::path(context->config.tempmoviedir) / ("inputs" + std::to_string(i));
         if (std::filesystem::exists(p)) {
-            oss << " " << f;
+            oss << " inputs" << i;
         }
     }
 
