@@ -815,8 +815,6 @@ void GameLoop::processInputs(AllInputs &ai)
                 /* Allow lua to modify inputs past the end of the movie */
                 Lua::Input::registerInputs(&ai);
                 Lua::Callbacks::call(Lua::NamedLuaFunction::CallbackInput);
-                if (modified_by_lua)
-                    movie.inputs->wasModified();
                 Lua::Input::clearInputs();
             }
 
