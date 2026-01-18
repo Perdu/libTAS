@@ -3,14 +3,24 @@
 
 * Debug window for file descriptors
 * File Debug OSD shows all files with types
+* Hook SDL_SetWindowResizable to avoid a window resize call (fix #700)
 
 ### Changed
+
+* Don't enforce memory commit of a 8MB stack, but support stack changing size
+  between savestates (#684)
+
 ### Fixed
 
 * Savestates now restore better file descriptors
 * Fix SDL getting window dimensions of zero
 * Better handling of opendir/readdir and savefiles
 * Fix the Unity job handling not calling the completed callback
+* Fix crash when using lua input function outside onInput callback (fix #697)
+* Fix a crash when pasting no input in the input editor (fix #696)
+* Fix lua script getting activated when modified (fix #692)
+* gui.pixel() now actually draws a pixel (fix #691)
+* Fix encoding softlock when resolution has changed (fix #689)
 
 ## [1.4.7] - 2025-10-06
 ### Added
