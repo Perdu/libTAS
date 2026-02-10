@@ -328,6 +328,13 @@ Insert `nb_frame` frames at current position
 
 Returns the full name of the movie file (.ltm).
 
+#### movie.getInitialSystemTime
+
+    (Number seconds, Number nseconds) movie.getInitialSystemTime()
+
+Returns the system time set at game startup. `seconds` is in whole seconds
+and `nseconds` is the number of nanoseconds.
+
 ### Runtime functions
 
 Runtime functions must be performed in callback `onFrame()` to be effective on
