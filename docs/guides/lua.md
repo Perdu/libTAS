@@ -388,6 +388,12 @@ Sleep for `length` milliseconds.
 
 Pause the game if playing, resume otherwise.
 
+#### runtime.exit
+
+    none runtime.exit()
+
+Exit the game.
+
 ### Ramsearch functions
 
 Ramsearch functions configure a ram search similar to the one of the Ramsearch window. The parameters correspond to what can be found there.
