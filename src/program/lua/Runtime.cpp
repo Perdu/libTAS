@@ -21,6 +21,7 @@
 
 #include "Context.h"
 
+#include <csignal> // kill
 #include <unistd.h>
 #include <iostream>
 extern "C" {
@@ -40,6 +41,7 @@ static const luaL_Reg runtime_functions[] =
     { "setFastForward", Lua::Runtime::setFastForward},
     { "sleepMS", Lua::Runtime::sleepMS},
     { "playPause", Lua::Runtime::playPause},
+    { "exit", Lua::Runtime::exit},
     { NULL, NULL }
 };
 
@@ -99,4 +101,12 @@ int Lua::Runtime::playPause(lua_State *L)
 {
     context->hotkey_pressed_queue.push(HOTKEY_PLAYPAUSE);
     return 0;
+}
+
+int Lua::Runtime::exit(lua_State *L)
+{
+    if (context->game_pid != 0) {
+        /* Terminate the game process */
+        kill(context->game_pid, SIGKILL);
+    }
 }

@@ -357,6 +357,12 @@ Sleep for `length` milliseconds.
 
 Pause the game if playing, resume otherwise.
 
+#### runtime.exit
+
+    none runtime.exit()
+
+Exit the game.
+
 ### Callbacks
 
 #### callback.onStartup
