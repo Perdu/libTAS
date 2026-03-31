@@ -205,7 +205,7 @@ int main(int argc, char **argv)
                 }
                 break;
             case '?':
-                std::cout << "Unknown option character" << std::endl;
+                std::cerr << "Unknown option character" << std::endl;
                 return -1;
             case 'h':
                 print_usage();
