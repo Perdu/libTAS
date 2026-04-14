@@ -1,3 +1,9 @@
+# Available build-args:
+# - RUFFLE_VERSION
+# - PCEM_VERSION
+# - LIBTAS_VERSION
+# These can be tags, commits, or branches
+
 FROM debian:12 AS ruffle-builder
 
   # Dependencies
@@ -14,10 +20,11 @@ FROM debian:12 AS ruffle-builder
   # Installs
     RUN mkdir /root/src
     # pin version
-    # ARG RUFFLE_VERSION=fa9c6627bd86511de1b710dcf42708dc55c44e3e
-    ARG RUFFLE_VERSION=""
-    RUN cd /root/src && git clone https://github.com/ruffle-rs/ruffle.git && cd ruffle && git checkout $RUFFLE_VERSION
+    RUN cd /root/src && git clone https://github.com/ruffle-rs/ruffle.git
     WORKDIR /root/src/ruffle
+    # ARG RUFFLE_VERSION=nightly-2026-04-12
+    ARG RUFFLE_VERSION=""
+    RUN git fetch --tags && git checkout $RUFFLE_VERSION
     ENV PATH="/root/.cargo/bin:${PATH}"
     RUN cargo build --release --package=ruffle_desktop
 
@@ -38,9 +45,11 @@ FROM debian:12 AS pcem-builder
 
   # Install
     RUN mkdir /root/src
-    # ARG PCEM_VERSION=v16_9b737f6
+    # ARG PCEM_VERSION=v17_13f53a2
     ARG PCEM_VERSION=""
     RUN cd /root/src && git clone https://github.com/TASVideos/pcem.git
+    WORKDIR /root/src/pcem
+    RUN git fetch --tags && git checkout $PCEM_VERSION
     RUN cd /root/src/pcem && autoreconf -i
     RUN cd /root/src/pcem && ./configure --enable-release-build
     RUN cd /root/src/pcem && make
@@ -64,12 +73,11 @@ FROM debian:12 AS libtas-builder
 
   # Installs
     RUN mkdir /root/src
-    # RUN cd /root/src && git clone https://github.com/clementgallet/libTAS.git
-    # ARG LIBTAS_VERSION=a6748b4f0c943fc1fc4b71c74b51b3be8aac0ac8
+    # ARG LIBTAS_VERSION=1410c417d903705448a9d2bd69051959f7085b20
     ARG LIBTAS_VERSION=""
-    RUN cd /root/src && git clone https://github.com/Perdu/libTAS.git && cd /root/src/libTAS && git checkout $LIBTAS_VERSION
-    # RUN git fetch origin pull/667/head:pr-667 && git checkout pr-667
+    RUN cd /root/src && git clone https://github.com/clementgallet/libTAS.git
     WORKDIR /root/src/libTAS
+    RUN git fetch --tags && git checkout $LIBTAS_VERSION
     RUN ./build.sh --with-i386
     RUN cd ./build && make install
 
@@ -95,8 +103,12 @@ FROM debian:12-slim
   # util
     xvfb
 
+  # Otherwise, libTAS won't start
+  RUN mkdir /root/.config/
+  RUN mkdir -p /root/.local/share/
+
   COPY --from=pcem-builder /root/src/pcem/pcem /usr/local/bin/pcem
-  COPY --from=ruffle-builder /root/src/ruffle/target/release/ruffle_desktop /usr/local/bin/ruffle_desktop
+  COPY --from=ruffle-builder /root/src/ruffle/target/release/ruffle_desktop /usr/local/bin/ruffle
   COPY --from=libtas-builder /root/src/libTAS/build/AppDir/usr/bin/libTAS /usr/local/bin/libTAS
   COPY --from=libtas-builder /root/src/libTAS/build/AppDir/usr/bin/libtas.so /usr/local/bin/libtas.so
   COPY --from=libtas-builder /root/src/libTAS/build/AppDir/usr/bin/libtas32.so /usr/local/bin/libtas32.so
