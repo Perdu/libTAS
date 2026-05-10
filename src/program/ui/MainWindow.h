@@ -76,6 +76,8 @@ public:
     /* Capture the user closing the game and show a "save your work?" dialog */
     void closeEvent(QCloseEvent *event);
 
+    void showLuaConsoleWindow();
+
     std::thread game_thread;
     GameLoop *gameLoop;
     Context *context;

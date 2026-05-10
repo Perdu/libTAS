@@ -730,6 +730,11 @@ void MainWindow::createMenus()
     inputMenu->addAction(tr("Joystick inputs..."), controllerTabWindow, &ControllerTabWindow::show);
 }
 
+void MainWindow::showLuaConsoleWindow()
+{
+    windowManager->showLuaConsoleWindow();
+}
+
 void MainWindow::updateStatus(int status)
 {
     /* Update game status (active/inactive) */
