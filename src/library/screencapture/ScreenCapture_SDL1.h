@@ -25,12 +25,18 @@
 
 #include <stdint.h>
 
-namespace SDL1 {
+namespace libtas {
+
+namespace sdl1 {
 class SDL_Surface;
 }
 
-namespace libtas {
-
+/**
+ * @class ScreenCapture_SDL1
+ * @brief SDL1-based screen capture implementation.
+ *
+ * Captures the screen via SDL 1.x surface APIs.
+ */
 class ScreenCapture_SDL1 : public ScreenCapture_Impl {
 
 public:
@@ -65,7 +71,7 @@ public:
     void restoreScreenState();
 
 private:
-    ::SDL1::SDL_Surface* screenSDL1Surf = nullptr;
+    sdl1::SDL_Surface* screenSDL1Surf = nullptr;
 
 };
 }

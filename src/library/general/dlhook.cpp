@@ -34,6 +34,7 @@
 #include "UnityHacks.h"
 #include "fileio/SaveFileList.h"
 #include "fileio/SaveFile.h"
+#include "rendering/vulkanloader.h"
 #include "../external/elfhacks.h"
 #include "../dyld_func_lookup_helper/dyld_func_lookup_helper.h"
 
@@ -287,24 +288,34 @@ __attribute__((noipa)) void *dlopen(const char *file, int mode) __THROW {
     return result;
 }
 
-void *find_sym(const char *name, bool original) {
+void *find_sym(const char *name) {
+    GlobalNative gn;
+
+    char* libtaspath = getenv("LIBTAS_LIBRARY_PATH");
+    if (libtaspath == nullptr) {
+        LOG(LL_ERROR, LCF_HOOK, "   LIBTAS_LIBRARY_PATH is not set, guess libtas.so path");
+        return nullptr;
+    }
+    std::string libtasstr = libtaspath;
+
+    void *libtaslib = dlopen(libtaspath, RTLD_LAZY | RTLD_NOLOAD);
+    if (libtaslib == nullptr) {
+        LOG(LL_ERROR, LCF_HOOK, "   Could not find already loaded libtas.so!");
+        return nullptr;
+    }
+
     dlerror(); // Clear pending errors
-    void *addr = orig::dlsym(RTLD_DEFAULT, name);
+    void *addr = orig::dlsym(libtaslib, name);
     if (dlerror() == nullptr) {
         Dl_info info;
         int res = dladdr(addr, &info);
         if (res != 0) {
             std::string libpath = info.dli_fname;
-            const char* libtaspath = nullptr;
-            NATIVECALL(libtaspath = getenv("LIBTAS_LIBRARY_PATH"));
             bool fromLibtas = false;
-            if (libtaspath != nullptr) {
-                std::string libtasstr = libtaspath;
-                fromLibtas = libpath.length() >= libtasstr.length() &&
-                    libpath.compare(libpath.length()-libtasstr.length(), libtasstr.length(), libtasstr) == 0;
-            }
-            if (original == fromLibtas) {
-                addr = nullptr;
+            fromLibtas = libpath.length() >= libtasstr.length() &&
+                libpath.compare(libpath.length()-libtasstr.length(), libtasstr.length(), libtasstr) == 0;
+            if (!fromLibtas) {
+                return nullptr;
             }
         }
     }
@@ -405,8 +416,13 @@ void *dlsym(void *handle, const char *name) __THROW {
      */
 
     void *addr = find_sym(name);
+    void *orig_addr = orig::dlsym(handle, name);
     if (addr == nullptr) {
-        addr = orig::dlsym(handle, name);
+        addr = orig_addr;
+    }
+    /* We store the original pointer now, in case we may not be able to get it later */
+    if (orig_addr) {
+        vk_store_proc(name, orig_addr);
     }
 
 #ifdef __linux__

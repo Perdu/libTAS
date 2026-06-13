@@ -19,33 +19,7 @@
 
 #include "sdldynapi.h"
 
-/* Define some SDL functions that appear in later versions, so that 
- * distributions that are bundled with old version can still compile this */
-#include "inputs/sdljoystick.h"
-
-#if !SDL_VERSION_ATLEAST(2,0,5)
-OVERRIDE int SDL_GetDisplayUsableBounds(int displayIndex, SDL_Rect * rect);
-#endif
-
-#if !SDL_VERSION_ATLEAST(2,0,12)
-typedef enum
-{
-    SDL_ScaleModeNearest, /**< nearest pixel sampling */
-    SDL_ScaleModeLinear,  /**< linear filtering */
-    SDL_ScaleModeBest     /**< anisotropic filtering */
-} SDL_ScaleMode;
-OVERRIDE int SDL_SetTextureScaleMode(SDL_Texture * texture, SDL_ScaleMode scaleMode);
-#endif
-
-#if !SDL_VERSION_ATLEAST(2,0,17)
-OVERRIDE int SDL_RenderGeometryRaw(SDL_Renderer *renderer, SDL_Texture *texture,
-    const float *xy, int xy_stride, const SDL_Color *color, int color_stride,
-    const float *uv, int uv_stride, int num_vertices,
-    const void *indices, int num_indices, int size_indices);
-#endif
-
 #include "logging.h"
-#include "general/dlhook.h"
 #include "hook.h"
 #include "GlobalState.h"
 #include "../external/elfhacks.h"
@@ -55,29 +29,50 @@ OVERRIDE int SDL_RenderGeometryRaw(SDL_Renderer *renderer, SDL_Texture *texture,
 
 namespace libtas {
 
-DEFINE_ORIG_POINTER(SDL_DYNAPI_entry)
-#define SDL_LINK(FUNC) DEFINE_ORIG_POINTER(FUNC)
-#define SDL_HOOK(FUNC)
-#include "sdlhooks.h"
+static Uint32 sdl_apiver = 0;
+static void* orig_sdl_table[index_sdl3::SDL_EnumCount] = {};
 
-namespace index {
-enum {
-#define SDL_DYNAPI_PROC(rc,fn,params,args,ret) fn,
-#define SDL_DYNAPI_PROC_NO_VARARGS 0
-#include "../../external/SDL_dynapi_procs.h"
-#undef SDL_DYNAPI_PROC_NO_VARARGS
-#undef SDL_DYNAPI_PROC
-};
+int getSDLApiver()
+{
+    return sdl_apiver;
 }
+
+void** getOrigSDLFuncLoc(int index_sdl)
+{
+    return getOrigSDLFuncLoc(index_sdl, index_sdl);
+}
+
+void** getOrigSDLFuncLoc(int index_sdl2, int index_sdl3)
+{
+    if (sdl_apiver == 1) {
+        return &orig_sdl_table[index_sdl2];
+    }
+    else if (sdl_apiver == 2) {
+        return &orig_sdl_table[index_sdl3];
+    }
+    else {
+        /* If SDL_DYNAPI_entry was not called, it means that it is either SDL1,
+         * or very early SDL2. In either case, we use SDL2 indexing. */
+        return &orig_sdl_table[index_sdl2];
+    }
+}
+
+decltype(&SDL_DYNAPI_entry) orig_SDL_DYNAPI_entry;
 
 void setDynapiAddr(uint64_t addr)
 {
-    LOG(LL_DEBUG, LCF_SDL, "Received SDL_DYNAPI_entry address %llx", addr);
-    orig::SDL_DYNAPI_entry = reinterpret_cast<decltype(orig::SDL_DYNAPI_entry)>(addr);
+    LOG(LL_DEBUG, LCF_SDL | LCF_HOOK, "Received SDL_DYNAPI_entry address %llx", addr);
+    orig_SDL_DYNAPI_entry = reinterpret_cast<decltype(&SDL_DYNAPI_entry)>(addr);
 }
 
 /* Override */ Sint32 SDL_DYNAPI_entry(Uint32 apiver, void *table, Uint32 tablesize) {
-    LOGTRACE(LCF_SDL);
+    LOGTRACE(LCF_SDL | LCF_HOOK);
+
+    sdl_apiver = apiver;
+    if ((apiver != 1) && (apiver != 2)) {
+        LOG(LL_ERROR, LCF_SDL | LCF_HOOK, "Unsupported SDL API version %d!", apiver);
+        return 1;
+    }
 
     /* Try finding the original SDL_DYNAPI_entry function. The more generic way
      * is to determine in which file the calling function is located with  
@@ -87,46 +82,58 @@ void setDynapiAddr(uint64_t addr)
      * executables, even if bash command `readelf` shows the symbol...
      * So in this case, we received the symbol address from libtas program. */
 
-    if (!orig::SDL_DYNAPI_entry) {
+    if (!orig_SDL_DYNAPI_entry) {
         Dl_info info;
         if (dladdr(__builtin_return_address(0), &info)) {
             /* Get the dynamic library name of our caller */
 
-            LOG(LL_DEBUG, LCF_SDL, "   Try extracting original SDL_DYNAPI_entry function from file %s", info.dli_fname);
+            LOG(LL_DEBUG, LCF_SDL | LCF_HOOK, "   Try extracting original SDL_DYNAPI_entry function from file %s", info.dli_fname);
             eh_obj_t obj;
             int ret = eh_find_obj(&obj, info.dli_fname);
             if (ret == 0) {
-                eh_find_sym(&obj, "SDL_DYNAPI_entry", (void **) &orig::SDL_DYNAPI_entry);
+                eh_find_sym(&obj, "SDL_DYNAPI_entry", (void **) &orig_SDL_DYNAPI_entry);
                 eh_destroy_obj(&obj);
             }
         }
     }
 
-    if (!orig::SDL_DYNAPI_entry) {        
+    if (!orig_SDL_DYNAPI_entry) {
         /* We couldn't find the SDL library that is supposed to be used by the
         * game, so we load the system SDL library instead */
-        LOG(LL_WARN, LCF_SDL, "   Could not find the original SDL_DYNAPI_entry function, using the system one");
-        LINK_NAMESPACE_SDL2(SDL_DYNAPI_entry);
+        LOG(LL_WARN, LCF_SDL | LCF_HOOK, "   Could not find the original SDL_DYNAPI_entry function, using the system one");
+        if (apiver == 1)
+            link_function((void**)&orig_SDL_DYNAPI_entry, "SDL_DYNAPI_entry", "libSDL2-2.0.so.0");
+        else if (apiver == 2)
+            link_function((void**)&orig_SDL_DYNAPI_entry, "SDL_DYNAPI_entry", "libSDL3.so.0");
         
-        if (!orig::SDL_DYNAPI_entry) {
-            LOG(LL_ERROR, LCF_SDL, "   Could not find any SDL_DYNAPI_entry function!");
+        if (!orig_SDL_DYNAPI_entry) {
+            LOG(LL_ERROR, LCF_SDL | LCF_HOOK, "   Could not find any SDL_DYNAPI_entry function!");
             return 1;
         }
     }
     
     /* Get the original pointers. */
-    Sint32 res = orig::SDL_DYNAPI_entry(apiver, table, tablesize);
+    Sint32 res = orig_SDL_DYNAPI_entry(apiver, table, tablesize);
     if (res != 0) {
-        LOG(LL_ERROR, LCF_SDL, "   The original SDL_DYNAPI_entry failed!");
+        LOG(LL_ERROR, LCF_SDL | LCF_HOOK, "   The original SDL_DYNAPI_entry failed!");
         return res;
+    }
+    else {
+        LOG(LL_DEBUG, LCF_SDL | LCF_HOOK, "   The original SDL_DYNAPI_entry succeeded with %d functions", tablesize / sizeof(void *));
     }
 
     /* Now save original pointers while replacing them with our hooks. */
     void **entries = static_cast<void **>(table);
 
+    if (tablesize > sizeof(orig_sdl_table)) {
+        LOG(LL_WARN, LCF_SDL | LCF_HOOK, "   The game loaded more functions that intended. SDL3_dynapi_procs.h probably needs to be updated.");
+        tablesize = sizeof(orig_sdl_table);
+    }
+    memcpy(orig_sdl_table, table, tablesize);
+
     /* TODO: Check SDL version, and try loading the system SDL instead of the
      * bundled SDL to get a version compatible with Dear ImGui. */
-    // orig::SDL_GetVersion = reinterpret_cast<decltype(&SDL_GetVersion)>(entries[index::SDL_GetVersion]);
+    // orig::SDL_GetVersion = reinterpret_cast<decltype(&SDL_GetVersion)>(entries[index_sdl2::SDL_GetVersion]);
     // SDL_version ver = {0, 0, 0};
     // orig::SDL_GetVersion(&ver);
     // 
@@ -137,28 +144,95 @@ void setDynapiAddr(uint64_t addr)
     /* TODO: Load the `SDL_DYNAPI_entry()` function from system SDL library */
     
     // std::vector<void*> full_entries;
-    // full_entries.resize(index::SDL_GetTouchName); // First function past 2.0.18
+    // full_entries.resize(index_sdl2::SDL_GetTouchName); // First function past 2.0.18
     // orig::SDL_DYNAPI_entry(apiver, full_entries.data(), full_entries.size() * sizeof(void *));
-// #define IF_IN_BOUNDS_FULL(FUNC) if (index::FUNC < full_entries.size())
+// #define IF_IN_BOUNDS_FULL(FUNC) if (index_sdl2::FUNC < full_entries.size())
 
     char* libtaspath;
     NATIVECALL(libtaspath = getenv("SDL_DYNAMIC_API"));
     if (libtaspath == nullptr) {
-        LOG(LL_ERROR, LCF_SDL, "   SDL_DYNAMIC_API is not set, cannot resolve libtas SDL dynapi hooks");
+        LOG(LL_ERROR, LCF_SDL | LCF_HOOK, "   SDL_DYNAMIC_API is not set, cannot resolve libtas SDL dynapi hooks");
         return 1;
     }
 
     void *libtaslib;
     NATIVECALL(libtaslib = dlopen(libtaspath, RTLD_LAZY | RTLD_NOLOAD));
     if (libtaslib == nullptr) {
-        LOG(LL_ERROR, LCF_SDL, "   Could not find already loaded libtas.so!");
+        LOG(LL_ERROR, LCF_SDL | LCF_HOOK, "   Could not find already loaded libtas.so!");
         return 1;
     }
 
-#define IF_IN_BOUNDS(FUNC) if (index::FUNC * sizeof(void *) < tablesize)
-#define SDL_LINK(FUNC) IF_IN_BOUNDS(FUNC) orig::FUNC = reinterpret_cast<decltype(&FUNC)>(entries[index::FUNC]); else LOG(LL_DEBUG, LCF_SDL | LCF_HOOK, "sdl dynapi symbol %s will not be imported", #FUNC);
-#define SDL_HOOK(FUNC) IF_IN_BOUNDS(FUNC) entries[index::FUNC] = reinterpret_cast<void *>(dlsym(libtaslib, #FUNC));
-#include "sdlhooks.h"
+    /* For each SDL function that we define, we assign its function pointer into the table
+     * returned by the original SDL_DYNAPI_entry function. First we look if the function
+     * defined inside its namespace (sdl2 or sdl3) has an implementation (it was defined
+     * with a weak symbol). If it does not exist, we try to load it dynamically from our
+     * own library with the symbol name.
+     * The former method is necessary when the same function exists in both SDL2 and SDL3, but
+     * with a different signature. The latter method is still present because wheneter possible,
+     * we left SDL functions as visible symbols, to support the standard way of hooking (LD_PRELOAD).
+     * This is still necessary for old games that were bundled with SDL1, or old SDL2 without
+     * dynapi support, or for games that deliberately disabled it. */
+
+    if (apiver == 1) {
+        LOG(LL_DEBUG, LCF_SDL | LCF_HOOK, "   Hooking SDL 2 functions...");
+
+#define IF_IN_BOUNDS(FUNC) if (index_sdl2::FUNC * sizeof(void *) < tablesize)
+#define SDL_DYNAPI_PROC(rc,fn,params,args,ret) \
+    IF_IN_BOUNDS(fn) { \
+        /* We first try to hook with a function defined in the sdl2 namespace. \
+         * The sdl2 namespace symbols were declared weak, so we can check if they are defined or not. \
+         * This is needed when the same function exists in both SDL2 and SDL3, but \
+         * with a different signature. */ \
+        void *sym = reinterpret_cast<void*>(&sdl2::fn); \
+        if (sym) { \
+            LOG(LL_DEBUG, LCF_SDL | LCF_HOOK, "   %s -> %p", #fn, sym); \
+            entries[index_sdl2::fn] = sym; \
+        } \
+        else { \
+            GlobalNative gn; \
+            sym = dlsym(libtaslib, #fn); \
+            if (sym) { \
+            LOG(LL_DEBUG, LCF_SDL | LCF_HOOK, "   %s -> %p", #fn, sym); \
+                entries[index_sdl2::fn] = sym; \
+            } \
+        } \
+    }
+#define SDL_DYNAPI_PROC_NO_VARARGS 1
+#include "../../external/SDL2_dynapi_procs.h"
+#undef SDL_DYNAPI_PROC_NO_VARARGS
+#undef SDL_DYNAPI_PROC
+#undef IF_IN_BOUNDS
+    }
+    else if (apiver == 2) {
+        LOG(LL_DEBUG, LCF_SDL | LCF_HOOK, "   Hooking SDL 3 functions...");
+
+#define IF_IN_BOUNDS(FUNC) if (index_sdl3::FUNC * sizeof(void *) < tablesize)
+#define SDL_DYNAPI_PROC(rc,fn,params,args,ret) \
+    IF_IN_BOUNDS(fn) { \
+        /* We first try to hook with a function defined in the sdl3 namespace. \
+         * The sdl3 namespace symbols were declared weak, so we can check if they are defined or not. \
+         * This is needed when the same function exists in both SDL2 and SDL3, but \
+         * with a different signature. */ \
+        void *sym = reinterpret_cast<void*>(&sdl3::fn); \
+        if (sym) { \
+            LOG(LL_DEBUG, LCF_SDL | LCF_HOOK, "   %s -> %p", #fn, sym); \
+            entries[index_sdl3::fn] = sym; \
+        } \
+        else { \
+            GlobalNative gn; \
+            sym = dlsym(libtaslib, #fn); \
+            if (sym) { \
+                LOG(LL_DEBUG, LCF_SDL | LCF_HOOK, "   %s -> %p", #fn, sym); \
+                entries[index_sdl3::fn] = sym; \
+            } \
+        } \
+    }
+#define SDL_DYNAPI_PROC_NO_VARARGS 1
+#include "../../external/SDL3_dynapi_procs.h"
+#undef SDL_DYNAPI_PROC_NO_VARARGS
+#undef SDL_DYNAPI_PROC
+#undef IF_IN_BOUNDS
+    }
 
     dlclose(libtaslib);
     return res;

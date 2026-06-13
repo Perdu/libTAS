@@ -22,20 +22,14 @@
 #include "logging.h"
 #include "hook.h"
 #include "GlobalState.h"
+#include "rendering/vulkanloader.h"
 #include "rendering/vulkanwrappers.h"
 
 #include "../external/imgui/imgui.h"
 #include "../external/imgui/imgui_impl_vulkan.h"
+#include "../external/imgui/imgui_impl_xlib.h"
 
 namespace libtas {
-
-DECLARE_ORIG_POINTER(vkGetInstanceProcAddr)
-DECLARE_ORIG_POINTER(vkBeginCommandBuffer)
-DECLARE_ORIG_POINTER(vkCmdBeginRenderPass)
-DECLARE_ORIG_POINTER(vkCmdEndRenderPass)
-DECLARE_ORIG_POINTER(vkEndCommandBuffer)
-DECLARE_ORIG_POINTER(vkQueueSubmit)
-DECLARE_ORIG_POINTER(vkQueueWaitIdle)
 
 #define VKCHECKERROR(err) \
 do { if (err < 0) LOG(LL_ERROR, LCF_WINDOW | LCF_VULKAN, "Vulkan error: %d", err); } while (0)
@@ -46,7 +40,7 @@ RenderHUD_Vulkan::~RenderHUD_Vulkan() {
 
 void RenderHUD_Vulkan::init() {
     
-    bool ret = ImGui_ImplVulkan_LoadFunctions([](const char* function_name, void*) { return orig::vkGetInstanceProcAddr(vk::context.instance, function_name); });
+    bool ret = ImGui_ImplVulkan_LoadFunctions(0, [](const char* function_name, void*) { return vkGetProcAddr(function_name); });
     if (!ret) {
         LOG(LL_ERROR, LCF_VULKAN, "ImGui_ImplVulkan_LoadFunctions failed");
     }
@@ -59,11 +53,11 @@ void RenderHUD_Vulkan::init() {
     init_info.Queue = vk::context.graphicsQueue;
     init_info.PipelineCache = VK_NULL_HANDLE;
     init_info.DescriptorPool = vk::context.descriptorPool;
-    init_info.RenderPass = vk::context.renderPass;
-    init_info.Subpass = 0;
+    init_info.PipelineInfoMain.RenderPass = vk::context.renderPass;
+    init_info.PipelineInfoMain.Subpass = 0;
     init_info.MinImageCount = vk::context.imageCount;
     init_info.ImageCount = vk::context.imageCount;
-    init_info.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
+    init_info.PipelineInfoMain.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
     init_info.UseDynamicRendering = false;
     init_info.Allocator = vk::context.allocator;
     init_info.CheckVkResultFn = vk::checkVkResult;
@@ -72,6 +66,7 @@ void RenderHUD_Vulkan::init() {
 
 void RenderHUD_Vulkan::fini() {
     if (ImGui::GetCurrentContext()) {
+        ImGui_ImplXlib_Shutdown();
         ImGui_ImplVulkan_Shutdown();
         ImGui::DestroyContext();
     }
@@ -90,7 +85,8 @@ void RenderHUD_Vulkan::newFrame()
     RenderHUD::newFrame();
     
     /* Update semaphore index */
-    vk::context.semaphoreIndex = (vk::context.semaphoreIndex + 1) % vk::context.imageCount;
+    // LOG(LL_DEBUG, LCF_VULKAN, "Update semaphore index %d -> %d", vk::context.semaphoreIndex, (vk::context.semaphoreIndex + 1) % vk::context.imageCount);
+    // vk::context.semaphoreIndex = (vk::context.semaphoreIndex + 1) % vk::context.imageCount;
 }
 
 void RenderHUD_Vulkan::render()
@@ -109,7 +105,7 @@ void RenderHUD_Vulkan::render()
         VkCommandBufferBeginInfo info = {};
         info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
         info.flags |= VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-        err = orig::vkBeginCommandBuffer(fd->osdCommandBuffer, &info);
+        err = vkProcs.BeginCommandBuffer(fd->osdCommandBuffer, &info);
         VKCHECKERROR(err);
     }
     
@@ -122,14 +118,14 @@ void RenderHUD_Vulkan::render()
         info.renderArea.extent.height = vk::context.height;
         info.clearValueCount = 1;
         info.pClearValues = &vk::context.clearValue;
-        orig::vkCmdBeginRenderPass(fd->osdCommandBuffer, &info, VK_SUBPASS_CONTENTS_INLINE);
+        vkProcs.CmdBeginRenderPass(fd->osdCommandBuffer, &info, VK_SUBPASS_CONTENTS_INLINE);
     }
     
     // Record dear imgui primitives into command buffer
     ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), fd->osdCommandBuffer);
     
     // Submit command buffer
-    orig::vkCmdEndRenderPass(fd->osdCommandBuffer);
+    vkProcs.CmdEndRenderPass(fd->osdCommandBuffer);
     {
         VkPipelineStageFlags stageFlags = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
         VkSubmitInfo info = {};
@@ -142,12 +138,12 @@ void RenderHUD_Vulkan::render()
         info.signalSemaphoreCount = 1;
         info.pSignalSemaphores = &vk::context.frameSemaphores[vk::context.semaphoreIndex].osdCompleteSemaphore;
     
-        err = orig::vkEndCommandBuffer(fd->osdCommandBuffer);
+        err = vkProcs.EndCommandBuffer(fd->osdCommandBuffer);
         VKCHECKERROR(err);
 
-        // LOG(LL_DEBUG, LCF_VULKAN, "    vkQueueSubmit wait on %llx and signal %llx and semindex %d", info.pWaitSemaphores[0], info.pSignalSemaphores[0], vk::context.semaphoreIndex);
+        LOG(LL_DEBUG, LCF_VULKAN, "vkQueueSubmit wait on %llx and signal %llx and semindex %d", info.pWaitSemaphores[0], info.pSignalSemaphores[0], vk::context.semaphoreIndex);
 
-        err = orig::vkQueueSubmit(vk::context.graphicsQueue, 1, &info, VK_NULL_HANDLE);
+        err = vkProcs.QueueSubmit(vk::context.graphicsQueue, 1, &info, VK_NULL_HANDLE);
         VKCHECKERROR(err);
 
         vk::context.currentSemaphore = vk::context.frameSemaphores[vk::context.semaphoreIndex].osdCompleteSemaphore;

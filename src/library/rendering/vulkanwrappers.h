@@ -85,16 +85,18 @@ namespace vk {
     uint32_t getMemoryTypeIndex(uint32_t typeBits, VkMemoryPropertyFlags properties);    
 }
 
-OVERRIDE VkResult vkCreateInstance(const VkInstanceCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkInstance* pInstance);
+VkResult vkCreateInstance(const VkInstanceCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkInstance* pInstance);
 
 OVERRIDE PFN_vkVoidFunction vkGetInstanceProcAddr(VkInstance instance, const char* pName);
 
-OVERRIDE PFN_vkVoidFunction vkGetDeviceProcAddr(VkDevice device, const char* pName);
+PFN_vkVoidFunction vkGetDeviceProcAddr(VkDevice device, const char* pName);
 
-VkResult myvkCreateDevice(VkPhysicalDevice physicalDevice, const VkDeviceCreateInfo* pCreateInfo,
+PFN_vkVoidFunction vkGetProcAddr(const char *proc);
+
+VkResult vkCreateDevice(VkPhysicalDevice physicalDevice, const VkDeviceCreateInfo* pCreateInfo,
                                 const VkAllocationCallbacks* pAllocator, VkDevice* pDevice);
 
-void myvkDestroyDevice(VkDevice device, const VkAllocationCallbacks* pAllocator);
+void vkDestroyDevice(VkDevice device, const VkAllocationCallbacks* pAllocator);
 
 void vkGetDeviceQueue(VkDevice device, uint32_t queueFamilyIndex, uint32_t queueIndex, VkQueue* pQueue);
 

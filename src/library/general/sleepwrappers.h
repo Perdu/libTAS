@@ -24,7 +24,7 @@
 
 #include <time.h>
 #include <unistd.h>
-#include <SDL2/SDL.h>
+#include "../external/SDL2.h"
 
 namespace libtas {
 
@@ -55,6 +55,25 @@ OVERRIDE int clock_nanosleep (clockid_t clock_id, int flags,
  * \brief Wait a specified number of milliseconds before returning.
  */
 OVERRIDE void SDL_Delay(Uint32 sleep);
+
+/**
+ * Wait a specified number of nanoseconds before returning.
+ *
+ * This function waits a specified number of nanoseconds before returning. It
+ * waits at least the specified time, but possibly longer due to OS
+ * scheduling.
+ *
+ * \param ns the number of nanoseconds to delay.
+ *
+ * \threadsafety It is safe to call this function from any thread.
+ *
+ * \since This function is available since SDL 3.2.0.
+ *
+ * \sa SDL_Delay
+ * \sa SDL_DelayPrecise
+ */
+OVERRIDE void SDL_DelayNS(Uint64 ns);
+
 
 OVERRIDE int sched_yield(void) __THROW;
 

@@ -78,11 +78,19 @@ static struct timespec samplesToTicks(int nbSamples, int frequency)
     return ticks;
 }
 
+AudioBuffer::SampleFormat AudioContext::default_format = AudioBuffer::SAMPLE_FMT_S16;
+int AudioContext::default_channels = 2;
+int AudioContext::default_frequency = 44100;
 
 AudioContext::AudioContext(void)
 {
-    outVolume = 1.0f;
+    volume = 1.0f;
     audio_thread = 0;
+    format = AudioBuffer::SAMPLE_FMT_UNKNOWN;
+    channels = 0;
+    frequency = 0;
+    is_loopback = false;
+    paused = false;
     init();
 }
 
@@ -93,24 +101,56 @@ AudioContext& AudioContext::get() {
 
 void AudioContext::init(void)
 {
-    outBitDepth = Global::shared_config.audio_bitdepth;
-    outNbChannels = Global::shared_config.audio_channels;
-    outFrequency = Global::shared_config.audio_frequency;
-    outAlignSize = outNbChannels * outBitDepth / 8;
-    isLoopback = false;
-    paused = false;
+    AudioBuffer::SampleFormat format = AudioBuffer::SAMPLE_FMT_UNKNOWN;
+    switch (Global::shared_config.audio_bitdepth) {
+        case 8:
+            format = AudioBuffer::SAMPLE_FMT_U8;
+            break;
+        case 16:
+            format = AudioBuffer::SAMPLE_FMT_S16;
+            break;
+        case 32:
+            format = AudioBuffer::SAMPLE_FMT_FLT;
+            break;
+    }
+
+    initValues(format, Global::shared_config.audio_channels, Global::shared_config.audio_frequency);
 }
 
-int AudioContext::createBuffer(void)
+void AudioContext::initDefaults(void)
+{
+    initValues(default_format, default_channels, default_frequency);
+}
+
+void AudioContext::initValues(AudioBuffer::SampleFormat new_format, int new_channels, int new_frequency)
+{
+    if (format == AudioBuffer::SAMPLE_FMT_UNKNOWN)
+        format = new_format;
+    
+    if (!channels)
+        channels = new_channels;
+    
+    if (!frequency)
+        frequency = new_frequency;
+
+    bytes_per_sample = channels * AudioBuffer::formatToBitDepth(format) / 8;
+}
+
+bool AudioContext::isInited(void) const
+{
+    return format != AudioBuffer::SAMPLE_FMT_UNKNOWN && channels > 0 && frequency > 0;
+}
+
+std::shared_ptr<AudioBuffer> AudioContext::createBuffer(void)
 {
     if (buffers.size() >= MAXBUFFERS)
-        return -1;
+        return nullptr;
 
     /* Check if we can recycle a deleted buffer */
     if (!buffers_pool.empty()) {
         buffers.push_front(buffers_pool.front());
         buffers_pool.pop_front();
-        return buffers.front()->id;
+        return buffers.front();
     }
 
     /* If not, we create a new buffer.
@@ -120,7 +160,26 @@ int AudioContext::createBuffer(void)
     auto newab = std::make_shared<AudioBuffer>();
     newab->id = buffers.size() + 1;
     buffers.push_front(newab);
-    return newab->id;
+    return newab;
+}
+
+std::shared_ptr<AudioBuffer> AudioContext::reuseBufferFromSourceOrCreate(AudioSource* source)
+{
+    auto buffer = source->reuseBuffer();
+    if (buffer)
+        return buffer;
+
+    /* Apply the source specs to the buffer */
+    buffer = createBuffer();
+    if (!buffer)
+        return nullptr;
+
+    buffer->format = source->format;
+    buffer->channels = source->channels;
+    buffer->frequency = source->frequency;
+    buffer->update();
+
+    return buffer;
 }
 
 void AudioContext::deleteBuffer(int id)
@@ -156,17 +215,17 @@ std::shared_ptr<AudioBuffer> AudioContext::getBuffer(int id) const
     return nullptr;
 }
 
-int AudioContext::createSource(void)
+std::shared_ptr<AudioSource> AudioContext::createSource(void)
 {
     if (sources.size() >= MAXSOURCES)
-        return -1;
+        return nullptr;
 
     /* Check if we can recycle a deleted source */
     if (!sources_pool.empty()) {
         sources.push_front(sources_pool.front());
         sources_pool.pop_front();
         sources.front()->init();
-        return sources.front()->id;
+        return sources.front();
     }
 
     /* If not, we create a new source.
@@ -176,7 +235,7 @@ int AudioContext::createSource(void)
     auto newas = std::make_shared<AudioSource>();
     newas->id = sources.size() + 1;
     sources.push_front(newas);
-    return newas->id;
+    return newas;
 }
 
 void AudioContext::deleteSource(int id)
@@ -214,12 +273,8 @@ std::shared_ptr<AudioSource> AudioContext::getSource(int id) const
 
 void AudioContext::mixAllSources(int nbSamples)
 {
-    if (outFrequency <= 0)
-        return;
-
-    return mixAllSources(samplesToTicks(nbSamples, outFrequency));
+    return mixAllSources(samplesToTicks(nbSamples, frequency));
 }
-
 
 void AudioContext::mixAllSources(struct timespec ticks)
 {
@@ -229,25 +284,44 @@ void AudioContext::mixAllSources(struct timespec ticks)
         return;
     }
 
-    if (outAlignSize <= 0 || outFrequency <= 0) {
-        LOG(LL_ERROR, LCF_SOUND, "Invalid output audio format, alignment %d frequency %d", outAlignSize, outFrequency);
-        outBytes = 0;
-        outNbSamples = 0;
-        outSamples.clear();
+    /* Skip when no ticks to mix */
+    if (ticks.tv_sec == 0 && ticks.tv_nsec == 0) {
+        samples_byte_size = 0;
+        samples_size = 0;
         return;
     }
 
-    outBytes = ticksToBytes(ticks, outAlignSize, outFrequency);
-  	/* Save the actual number of samples and size */
-  	outNbSamples = outBytes / outAlignSize;
+    /* Check if at least one source will output audio samples. If not, we can return immediately. */
+    bool will_output = false;
+    for (const auto& source : sources) {
+        will_output |= source->willOutput();
+    }
+    if (!will_output) {
+        samples_byte_size = 0;
+        samples_size = 0;
+        return;
+    }
 
-    LOG(LL_DEBUG, LCF_SOUND, "Start mixing about %d samples", outNbSamples);
+    /* Now that we will output audio, we must make sure that our output parameters are set */
+    if (!isInited()) {
+        initDefaults();
+    }
+
+    if (bytes_per_sample <= 0 || frequency <= 0) {
+        LOG(LL_ERROR, LCF_SOUND, "Invalid output audio format, alignment %d frequency %d", bytes_per_sample, frequency);
+        samples_byte_size = 0;
+        samples_size = 0;
+        return;
+    }
+
+    samples_byte_size = ticksToBytes(ticks, bytes_per_sample, frequency);
+  	/* Save the actual number of samples and size */
+  	samples_size = samples_byte_size / bytes_per_sample;
+
+    LOG(LL_DEBUG, LCF_SOUND, "Start mixing about %d samples", samples_size);
 
     /* Silent the output buffer */
-    if (outBitDepth == 8) // Unsigned 8-bit samples
-        outSamples.assign(outBytes, 0x80);
-    if (outBitDepth == 16) // Signed 16-bit samples
-        outSamples.assign(outBytes, 0);
+    samples_data.assign(samples_byte_size, AudioBuffer::formatToSilenceByte(format));
 
     if (paused) return;
 
@@ -282,12 +356,12 @@ void AudioContext::mixAllSources(struct timespec ticks)
             }
         }
 
-        source->mixWith(ticks, &outSamples[0], outBytes, outBitDepth, outNbChannels, outFrequency, outVolume);
+        source->mixWith(ticks, samples_data.data(), samples_byte_size, format, channels, frequency, volume);
     }
     
     mutex.unlock();
 
-    if (!isLoopback && !Global::shared_config.audio_mute) {
+    if (!is_loopback && !Global::shared_config.audio_mute) {
         /* Play the music */
 #ifdef __linux__
         AudioPlayerAlsa::play(*this);

@@ -19,26 +19,18 @@
 
 #include "RenderHUD_SDL2_renderer.h"
 
+#include "../external/SDL2.h" // SDL_Renderer
 #include "logging.h"
 #include "hook.h"
 #include "GlobalState.h"
 
 #include "sdl/sdlwindows.h"
+#include "sdl/sdldynapi.h"
 
 #include "../external/imgui/imgui.h"
 #include "../external/imgui/imgui_impl_sdlrenderer2.h"
 
 namespace libtas {
-
-DECLARE_ORIG_POINTER(SDL_CreateTexture)
-DECLARE_ORIG_POINTER(SDL_DestroyTexture)
-DECLARE_ORIG_POINTER(SDL_LockTexture)
-DECLARE_ORIG_POINTER(SDL_UnlockTexture)
-DECLARE_ORIG_POINTER(SDL_RenderCopy)
-DECLARE_ORIG_POINTER(SDL_SetTextureBlendMode)
-DECLARE_ORIG_POINTER(SDL_GetError)
-DECLARE_ORIG_POINTER(SDL_GetVersion)
-DECLARE_ORIG_POINTER(SDL_SetWindowResizable)
 
 RenderHUD_SDL2_renderer::~RenderHUD_SDL2_renderer()
 {
@@ -63,16 +55,16 @@ void RenderHUD_SDL2_renderer::newFrame()
             return;
         
         /* 2.0.18 is required for OSD */    
-        if (!orig::SDL_GetVersion)
+        if (!ORIG_SDL2_FUNCTION_POINTER(SDL_GetVersion))
             return;
         SDL_version ver;
-        orig::SDL_GetVersion(&ver);
+        ORIG_SDL2_CALL(SDL_GetVersion, (&ver));
         if ((ver.minor == 0) && (ver.patch < 18))
             return;
         
         if (RenderHUD::init()) {
             ImGui_ImplSDLRenderer2_Init(renderer);
-            orig::SDL_SetWindowResizable(sdl::gameSDLWindow, supportsLargerViewport()?SDL_TRUE:SDL_FALSE);
+            ORIG_SDL2_CALL(SDL_SetWindowResizable, (sdl::gameSDLWindow, supportsLargerViewport()?SDL_TRUE:SDL_FALSE));
         }
         else
             return;
@@ -86,7 +78,7 @@ void RenderHUD_SDL2_renderer::render()
 {
     if (ImGui::GetCurrentContext()) {
         ImGui::Render();
-        ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData());        
+        ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData(), renderer);        
     }
 }
 

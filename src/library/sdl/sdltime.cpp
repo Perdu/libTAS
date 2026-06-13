@@ -21,7 +21,6 @@
 
 #include "logging.h"
 #include "DeterministicTimer.h"
-#include "hook.h"
 
 namespace libtas {
 
@@ -41,6 +40,15 @@ namespace libtas {
     LOG(LL_TRACE, LCF_SDL | LCF_TIMEGET, "%s call - returning %llu", __func__, msec);
 
     return msec;
+}
+
+/* Override */ Uint64 SDL_GetTicksNS(void)
+{
+    struct timespec ts = DeterministicTimer::get().getTicks(SharedConfig::TIMETYPE_SDLGETTICKS);
+    Uint64 nsec = ts.tv_sec*1000000000ull + ts.tv_nsec;
+    LOG(LL_TRACE, LCF_SDL | LCF_TIMEGET, "%s call - returning %llu", __func__, nsec);
+
+    return nsec;
 }
 
 /* Override */ Uint64 SDL_GetPerformanceFrequency(void)

@@ -111,6 +111,7 @@ typedef void AssetBundleLoadFromStreamAsyncOperation;
 typedef void SoundHandle_Instance;
 typedef void SampleClip;
 typedef void FMOD_CREATESOUNDEXINFO;
+typedef void FanoutTask;
 
 struct Int128 {
     long a;
@@ -178,6 +179,10 @@ public:
     virtual bool MustCompleteNextFrame(PreloadManagerOperation* po);
     virtual bool GetAllowParallelExecution(PreloadManagerOperation* po);
     virtual char* GetDebugName(PreloadManagerOperation* po);
+    // int status; // at offset 0x50
+    // time_t queued_timestamp; // at offset 0x58
+    // suseconds_t integrate_time_sliced_duration; // at offset 0x60
+    // suseconds_t perform_duration; // at offset 0x68
 };
 
 class U6_PreloadManagerOperation
@@ -292,6 +297,7 @@ namespace orig {
     int (*U6_LoadFMODSound)(SoundHandle_Instance** si, char const* s, unsigned int f, SampleClip* c, unsigned int i, VFS_FileSize fs, FMOD_CREATESOUNDEXINFO* in) = nullptr;
 
     void (*U5_BaseUnityAnalytics_UpdateConfigFromServer)(void* a) = nullptr;
+    void (*physx_Cm_FanoutTask_RemoveReference)(FanoutTask* ft) = nullptr;
 }
 
 #include <signal.h>
@@ -502,6 +508,9 @@ static void U5_JobQueue_ScheduleJob(JobQueue *t, void (*func)(void*), void* arg,
     return orig::U5_JobQueue_ScheduleJob(t, func, arg, z, a, b);
 }
 
+/* For certain functions that will softlock if we attempt to wait for them, skip them */
+static thread_local bool skip_job_wait = false;
+
 static JobGroupID U5_JobQueue_ScheduleGroup(JobQueue *t, JobGroup* x, int y)
 {
     LOG(LL_TRACE, LCF_HACKS, "U5_JobQueue_ScheduleGroup called with JobGroup %p and priority %d", x, y);
@@ -513,24 +522,28 @@ static JobGroupID U5_JobQueue_ScheduleGroup(JobQueue *t, JobGroup* x, int y)
 
     if (Global::shared_config.game_specific_sync & SharedConfig::GC_SYNC_UNITY_JOBS) {
         /* Try waiting for the job */
-        if (orig::U5_JobQueue_HasJobGroupIDCompleted) {
+        // if (orig::U5_JobQueue_HasJobGroupIDCompleted && !skip_job_wait) {
 
-            bool has_completed = false;
-            for (int i = 0; i < 100; i++) {
-                if (orig::U5_JobQueue_HasJobGroupIDCompleted(t, j.group, j.tag)) {
-                    has_completed = true;
-                    break;
-                }
-                NATIVECALL(usleep(100));
-            }
-            if (!has_completed)
-                LOG(LL_WARN, LCF_HACKS, "    We could not wait for job group %p/%d to finish...", j.group, j.tag);
-        }
+        //     bool has_completed = false;
+        //     for (int i = 0; i < 100; i++) {
+        //         if (orig::U5_JobQueue_HasJobGroupIDCompleted(t, j.group, j.tag)) {
+        //             has_completed = true;
+        //             break;
+        //         }
+        //         NATIVECALL(usleep(100));
+        //     }
+        //     if (!has_completed) {
+        //         LOG(LL_WARN, LCF_HACKS, "    We could not wait for job group %p/%d to finish...", j.group, j.tag);
+        //         raise(SIGINT);
+        //     }
+        // }
         
-        // if (orig::U5_JobQueue_WaitForJobGroup)
-        //     orig::U5_JobQueue_WaitForJobGroup(t, j.group, j.tag, true);
-        // else if (orig::U5_JobQueue_WaitForJobGroupID)
-        //     orig::U5_JobQueue_WaitForJobGroupID(t, j.group, j.tag);
+        if (!skip_job_wait) {
+            if (orig::U5_JobQueue_WaitForJobGroup)
+                orig::U5_JobQueue_WaitForJobGroup(t, j.group, j.tag, true);
+            else if (orig::U5_JobQueue_WaitForJobGroupID)
+                orig::U5_JobQueue_WaitForJobGroupID(t, j.group, j.tag);
+        }
     }
 
     return j;
@@ -542,27 +555,30 @@ static JobGroupID U5_JobQueue_ScheduleJobMultipleDependencies(JobQueue *t, void*
     /* Return value is 16 bytes (accross registers RDX:RAX), so we need to use
      * a 16-byte struct to recover it. */
     JobGroupID j = orig::U5_JobQueue_ScheduleJobMultipleDependencies(t, func, arg, x, y);
+    LOG(LL_DEBUG, LCF_HACKS, "    returns JobGroup %p and JobGroup tag %d", j.group, j.tag);
 
     if (Global::shared_config.game_specific_sync & SharedConfig::GC_SYNC_UNITY_JOBS) {
         /* Try waiting for the job */
-        if (orig::U5_JobQueue_HasJobGroupIDCompleted) {
+        // if (orig::U5_JobQueue_HasJobGroupIDCompleted && !skip_job_wait) {
 
-            bool has_completed = false;
-            for (int i = 0; i < 100; i++) {
-                if (orig::U5_JobQueue_HasJobGroupIDCompleted(t, j.group, j.tag)) {
-                    has_completed = true;
-                    break;
-                }
-                NATIVECALL(usleep(100));
-            }
-            if (!has_completed)
-                LOG(LL_WARN, LCF_HACKS, "    We could not wait for job group %p/%d to finish...", j.group, j.tag);
-        }
+        //     bool has_completed = false;
+        //     for (int i = 0; i < 100; i++) {
+        //         if (orig::U5_JobQueue_HasJobGroupIDCompleted(t, j.group, j.tag)) {
+        //             has_completed = true;
+        //             break;
+        //         }
+        //         NATIVECALL(usleep(100));
+        //     }
+        //     if (!has_completed)
+        //         LOG(LL_WARN, LCF_HACKS, "    We could not wait for job group %p/%d to finish...", j.group, j.tag);
+        // }
         
-        // if (orig::U5_JobQueue_WaitForJobGroup)
-        //     orig::U5_JobQueue_WaitForJobGroup(t, j.group, j.tag, true);
-        // else if (orig::U5_JobQueue_WaitForJobGroupID)
-        //     orig::U5_JobQueue_WaitForJobGroupID(t, j.group, j.tag);
+        if (!skip_job_wait) {
+            if (orig::U5_JobQueue_WaitForJobGroup)
+                orig::U5_JobQueue_WaitForJobGroup(t, j.group, j.tag, true);
+            else if (orig::U5_JobQueue_WaitForJobGroupID)
+                orig::U5_JobQueue_WaitForJobGroupID(t, j.group, j.tag);
+        }
     }
 
     return j;
@@ -940,6 +956,26 @@ static bool Helper_PreloadManager_GetAllowParallelExecution(PreloadManagerOperat
     return true;
 }
 
+/* Operation status goes from 0 (queued) -> 1 (active) -> 2 (done) */
+static bool Helper_PreloadManagerOperation_GetStatus(PreloadManagerOperation* o)
+{
+    if (!o)
+        return 1;
+
+    int status = -1;
+    if (GetUnityVersionMaj() == 6000)
+        status = *(int *)(o + 0x40);
+    else if ((GetUnityVersionMaj() >= 2017) && (GetUnityVersionMaj() <= 2020))
+        status = *(int *)(o + 0x50);
+    else if (GetUnityVersionMaj() == 5)
+        status = *(int *)(o + 0x2c);
+    if (status < 0 || status > 2) {
+        LOG(LL_WARN, LCF_HACKS | LCF_FILEIO, "    Invalid status for PreloadManagerOperation");
+        status = 1;
+    }
+    return status;
+}
+
 /* This helper function waits until the pending queue is empty (after the last
  * operation was processed, this is important!), or if the Preload thread is
  * currently waiting on a non-parallel operation */
@@ -947,19 +983,35 @@ static void Helper_PreloadManager_WaitForQueueToProcess(PreloadManager* m, Prelo
 {
     /* Special case for when the preload thread is not running, hence it cannot
      * process operations. */
-    if (!is_preload_thread_running)
+    if (!is_preload_thread_running) {
+        LOG(LL_DEBUG, LCF_HACKS | LCF_FILEIO, "    preload thread is not running");
         return;
+    }
 
     int i;
     for (i=0; i < 4000; i++) {
         /* If possible, we rely on these two functions to be hooked */
         if (orig::U6_PreloadManager_PrepareProcessingPreloadOperation && orig::U6_PreloadManager_ProcessSingleOperation) {
-            if (pending_queue_size == 0)
+            if (pending_queue_size == 0) {
+                LOG(LL_DEBUG, LCF_HACKS | LCF_FILEIO, "    preload operation was completed");
                 break;
+            }
 
             /* Check if the pending operation is non-parallel */
-            if (is_current_pending_operation_non_parallel)
-                break;
+            if (is_current_pending_operation_non_parallel) {
+                /* If the current non-parallel operation is the one we just pushed, we still have to wait for the 
+                 * operation to be processed.*/
+                if (pending_queue_size == 1) {
+                    if (Helper_PreloadManagerOperation_GetStatus(o) == 1) {
+                        LOG(LL_DEBUG, LCF_HACKS | LCF_FILEIO, "    non-parallel operation was completed");
+                        break;
+                    }
+                }
+                else {
+                    LOG(LL_DEBUG, LCF_HACKS | LCF_FILEIO, "    another non-parallel operation is being processed, this one won't be processed yet, so we can resume");
+                    break;
+                }
+            }
         }
         else {
             /* This sucks, we must rely on internals to get what we want... */
@@ -968,7 +1020,7 @@ static void Helper_PreloadManager_WaitForQueueToProcess(PreloadManager* m, Prelo
                 if (o) {
                     /* Operation status goes from 0 (queued) -> 1 (active) -> 2 (done) */
                     /* Check if the operation was pushed (status == 1) */
-                    pending_queue_empty = (1 == *(int *)(o + 0x40));
+                    pending_queue_empty = (1 == Helper_PreloadManagerOperation_GetStatus(o));
                     // pending_queue_empty = (1 == *(int *)(o + 0x48));
                 }
                 else
@@ -1012,7 +1064,7 @@ static void Helper_PreloadManager_WaitForQueueToProcess(PreloadManager* m, Prelo
         if (GetUnityVersionMaj() == 6000) {
             if (o) {
                 LOG(LL_WARN, LCF_HACKS | LCF_FILEIO, "    operation status: queued");
-                int operation_status = *(int *)(o + 0x40);
+                int operation_status = Helper_PreloadManagerOperation_GetStatus(o);
                 switch (operation_status) {
                     case 0:
                         LOG(LL_WARN, LCF_HACKS | LCF_FILEIO, "    operation status: queued");
@@ -1393,6 +1445,14 @@ static void U5_BaseUnityAnalytics_UpdateConfigFromServer(void* a)
     // return orig::U5_BaseUnityAnalytics_UpdateConfigFromServer(a);
 }
 
+static void physx_Cm_FanoutTask_RemoveReference(FanoutTask* ft)
+{
+    LOGTRACE(LCF_HACKS);
+    skip_job_wait = true;
+    orig::physx_Cm_FanoutTask_RemoveReference(ft);
+    skip_job_wait = false;
+}
+
 #define FUNC_CASE(FUNC_ENUM, FUNC_SYMBOL) \
 case FUNC_ENUM: \
     hook_patch_addr(reinterpret_cast<void*>(address), reinterpret_cast<void**>(&orig::FUNC_SYMBOL), reinterpret_cast<void*>(FUNC_SYMBOL)); \
@@ -1493,6 +1553,7 @@ void UnityHacks::patch(int func, uint64_t addr)
 
         FUNC_CASE(UNITY6_LOAD_FMOD_SOUND, U6_LoadFMODSound)
         FUNC_CASE(UNITY5_ANALYTICS_UPDATE, U5_BaseUnityAnalytics_UpdateConfigFromServer)
+        FUNC_CASE(PHYSX_CM_FANOUTTASK_REMOVEREFERENCE, physx_Cm_FanoutTask_RemoveReference)
         
     }
 }

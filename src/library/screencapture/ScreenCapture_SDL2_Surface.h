@@ -24,11 +24,19 @@
 
 #include <stdint.h>
 
-class SDL_Surface;
-class SDL_Texture;
-
 namespace libtas {
 
+namespace sdl2 {
+    struct SDL_Surface;
+}
+struct SDL_Texture;
+
+/**
+ * @class ScreenCapture_SDL2_Surface
+ * @brief SDL2 surface-based screen capture implementation.
+ *
+ * Captures the screen by reading from SDL2 surfaces.
+ */
 class ScreenCapture_SDL2_Surface : public ScreenCapture_Impl {
 
 public:
@@ -65,7 +73,7 @@ public:
 private:
     
     /* SDL2 screen surface */
-    SDL_Surface* screenSDL2Surf = nullptr;
+    sdl2::SDL_Surface* screenSDL2Surf = nullptr;
 
     /* SDL2 screen texture */
     SDL_Texture* screenSDLTex = nullptr;

@@ -31,7 +31,7 @@
 
 #include <X11/Xlib.h>
 #include <cstring>
-// #include <SDL2/SDL.h>
+// #include "../external/SDL2.h"
 
 namespace libtas {
 
@@ -79,8 +79,7 @@ int ScreenCapture_Impl::init()
 #error "ScreenCapture not implemented for MacOS"
         /* Use SDL2 window for now */
         // if (Global::game_info.video & GameInfo::SDL2) {
-            //     LINK_NAMESPACE_SDL2(SDL_GetWindowSize);
-            //     orig::SDL_GetWindowSize(sdl::gameSDLWindow, &width, &height);
+            //     ORIG_SDL2_CALL(SDL_GetWindowSize, (sdl::gameSDLWindow, &width, &height));
             // }
 #endif
     }

@@ -79,14 +79,14 @@ struct __attribute__((packed, aligned(8))) SharedConfig {
     int nb_controllers = 0;
 
     /** Sound config **/
-    /* Bit depth of the buffer (usually 8 or 16) */
-    int audio_bitdepth = 16;
+    /* Bit depth of the buffer (usually 8 or 16). 0 for auto */
+    int audio_bitdepth = 0;
 
-    /* Number of channels of the buffer */
-    int audio_channels = 2;
+    /* Number of channels of the buffer. 0 for auto */
+    int audio_channels = 0;
 
-    /* Frequency of buffer in Hz */
-    int audio_frequency = 44100;
+    /* Frequency of buffer in Hz. 0 for auto */
+    int audio_frequency = 0;
 
     /* Audio gain from 0.0 to 1.0 */
     float audio_gain = 1.0f;
@@ -184,6 +184,9 @@ struct __attribute__((packed, aligned(8))) SharedConfig {
     };
 
     int locale = LOCALE_ENGLISH;
+
+    /* Number of CPU cores the game sees. 0 for native. */
+    int cpu_cores = 0;
 
     /* An enum indicating which wait are we doing */
     enum AsyncType

@@ -115,6 +115,7 @@ libtas_so_SOURCES = \
     renderhud/ProfilerDebug.cpp \
     renderhud/RenderHUD_GL.cpp \
     renderhud/RenderHUD_SDL2_renderer.cpp \
+    renderhud/RenderHUD_SDL3_renderer.cpp \
     renderhud/RenderHUD_Vulkan.cpp \
     renderhud/RenderHUD.cpp \
     renderhud/RenderHUD_Base_Linux.cpp \
@@ -124,11 +125,13 @@ libtas_so_SOURCES = \
     rendering/openglloader.cpp \
     rendering/openglwrappers.cpp \
     rendering/vdpauwrappers.cpp \
+    rendering/vulkanloader.cpp \
     rendering/vulkanwrappers.cpp \
     screencapture/ScreenCapture_GL.cpp \
     screencapture/ScreenCapture_SDL1.cpp \
     screencapture/ScreenCapture_SDL2_Renderer.cpp \
     screencapture/ScreenCapture_SDL2_Surface.cpp \
+    screencapture/ScreenCapture_SDL3_Renderer.cpp \
     screencapture/ScreenCapture_VDPAU.cpp \
     screencapture/ScreenCapture_Vulkan.cpp \
     screencapture/ScreenCapture_XShm.cpp \
@@ -145,6 +148,7 @@ libtas_so_SOURCES = \
     sdl/sdltime.cpp \
     sdl/sdltimer.cpp \
     sdl/sdlversion.cpp \
+    sdl/sdlvulkan.cpp \
     sdl/sdlwindows.cpp \
     steam/CCallback.cpp \
     steam/CCallbackManager.cpp \
@@ -234,6 +238,7 @@ libtas_so_SOURCES = \
     ../external/imgui/imgui.cpp \
     ../external/imgui/imgui_impl_opengl3.cpp \
     ../external/imgui/imgui_impl_sdlrenderer2.cpp \
+    ../external/imgui/imgui_impl_sdlrenderer3.cpp \
     ../external/imgui/imgui_impl_vulkan.cpp \
     ../external/imgui/imgui_impl_xlib.cpp \
     ../external/imgui/implot_items.cpp \

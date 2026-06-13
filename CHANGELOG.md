@@ -1,7 +1,16 @@
 ## [Unreleased]
 ### Added
+
+* Can tweak the number of cpu cores seen by the game
+
 ### Changed
+
+* Include all SDL2 needed definitions
+* Try to support games calling vk functions directly
+
 ### Fixed
+
+* Skip freeing cursors that were not loaded
 
 ## [1.4.8] - 2026-05-14
 ### Added

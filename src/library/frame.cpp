@@ -164,8 +164,10 @@ void frameBoundary(std::function<void()> draw, RenderHUD& hud)
     /* Reset the busy loop detector */
     BusyLoopDetection::reset();
 
-    /* Initialize Screen Capture on the first real screen draw */
-    ScreenCapture::init();
+    /* Initialize Screen Capture on the first real screen draw, because games may initialize only 
+     * part of the rendering context, and then sleep which can trigger a frame boundary. */
+    if (draw)
+        ScreenCapture::init();
 
     /* Wait for events to be processed by the game */
 #ifdef __unix__
@@ -189,7 +191,7 @@ void frameBoundary(std::function<void()> draw, RenderHUD& hud)
 
     /* Mix audio, except if the game opened a loopback context */
     AudioContext& audiocontext = AudioContext::get();
-    if (! audiocontext.isLoopback) {
+    if (! audiocontext.is_loopback) {
         PROFILE_SCOPE("Audio Mix", PROFILER_INFO_FRAME);
         audiocontext.mixAllSources(timeIncrement);
     }
@@ -199,7 +201,7 @@ void frameBoundary(std::function<void()> draw, RenderHUD& hud)
         detTimer.flushDelay();
 
         if (draw)
-            NATIVECALL(draw());
+            draw();
 
         /* Still push native events so that the game can exit properly */
         if ((Global::game_info.video & GameInfo::SDL1) || (Global::game_info.video & GameInfo::SDL2)) {
@@ -337,10 +339,9 @@ void frameBoundary(std::function<void()> draw, RenderHUD& hud)
 
     /* Actual draw command */
     if (!Global::skipping_draw && draw) {
-        GlobalNoLog gnl;
         perfTimer.switchTimer(PerfTimer::RenderTimer);
         PROFILE_SCOPE("Draw", PROFILER_INFO_FRAME);
-        NATIVECALL(draw());
+        draw();
         perfTimer.switchTimer(PerfTimer::FrameTimer);
     }
 
@@ -379,7 +380,7 @@ void frameBoundary(std::function<void()> draw, RenderHUD& hud)
                     ScreenCapture::copySurfaceToScreen();
                 hud.drawAll(framecount, nondraw_framecount, Inputs::ai, preview_ai);
                 hud.render();
-                NATIVECALL(draw());
+                draw();
                 /* End of FIXME */
 
                 /* Now the real redraw */
@@ -397,7 +398,7 @@ void frameBoundary(std::function<void()> draw, RenderHUD& hud)
                 ScreenCapture::copyScreenToSurface();
                 
                 /* Draw is mandatory to release the acquired image */
-                NATIVECALL(draw());
+                draw();
             }
         }
 
@@ -519,14 +520,14 @@ void frameBoundary(std::function<void()> draw, RenderHUD& hud)
 static void pushQuitEvent(void)
 {
     if (Global::game_info.video & GameInfo::SDL1) {
-        SDL1::SDL_Event ev;
-        ev.type = SDL1::SDL_QUIT;
+        sdl1::SDL_Event ev;
+        ev.type = sdl1::SDL_QUIT;
         sdlEventQueue.insert(&ev);
     }
 
     if (Global::game_info.video & GameInfo::SDL2) {
-        SDL_Event ev;
-        ev.type = SDL_QUIT;
+        sdl2::SDL_Event ev;
+        ev.type = sdl2::SDL_QUIT;
         sdlEventQueue.insert(&ev);
     }
 
@@ -583,8 +584,7 @@ static void screen_redraw(std::function<void()> draw, RenderHUD& hud, const AllI
             hud.drawAll(framecount, nondraw_framecount, Inputs::ai, preview_ai);
             hud.render();
             
-            GlobalNoLog gnl;
-            NATIVECALL(draw());
+            draw();
         }
     }
 }
@@ -623,8 +623,7 @@ static void receive_messages(std::function<void()> draw, RenderHUD& hud)
             /* We need to poll events, otherwise the game appears as non-responsive.
              * TODO: Put this at appropriate place */
             if ((Global::game_info.video & GameInfo::SDL1) || (Global::game_info.video & GameInfo::SDL2)) {
-                LINK_NAMESPACE_SDLX(SDL_PumpEvents);
-                orig::SDL_PumpEvents();
+                ORIG_SDL2_CALL(SDL_PumpEvents,());
             }
 #endif
             
@@ -734,8 +733,8 @@ static void receive_messages(std::function<void()> draw, RenderHUD& hud)
                     saving_msg += std::to_string(slot);
                     MessageWindow::insert(saving_msg.c_str());
                     // Force redraw because screen refresh won't happen during savestate
-                    screen_redraw(draw, hud, preview_ai, true);
-                    screen_redraw(draw, hud, preview_ai, true);
+                    // screen_redraw(draw, hud, preview_ai, true);
+                    // screen_redraw(draw, hud, preview_ai, true);
                 }
 
                 status = SaveStateManager::checkpoint(slot);

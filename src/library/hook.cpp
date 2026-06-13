@@ -31,11 +31,11 @@
 
 namespace libtas {
 
-bool link_function(void** function, const char* source, const char* library, const char *version /*= nullptr*/)
+void* link_function(void** function, const char* source, const char* library, const char *version /*= nullptr*/)
 {
     /* Test if function is already linked */
     if (*function != nullptr)
-        return true;
+        return *function;
 
     /* First try to link it from the global namespace */
 #ifdef __linux__
@@ -46,8 +46,16 @@ bool link_function(void** function, const char* source, const char* library, con
         NATIVECALL(*function = dlsym(RTLD_NEXT, source));
 
     if (*function != nullptr) {
+        /* Gather from which library was the function imported */
+        Dl_info info;
+        int res = dladdr(*function, &info);
+        if (res != 0) {
+            LOG(LL_DEBUG, LCF_HOOK, "Imported symbol %s function : %p (from %s)", source, *function, info.dli_fname);
+        }
+        else {
         LOG(LL_DEBUG, LCF_HOOK, "Imported symbol %s function : %p", source, *function);
-        return true;
+        }
+        return *function;
     }
 
     if (library != nullptr) {
@@ -68,7 +76,7 @@ bool link_function(void** function, const char* source, const char* library, con
 
                 if (*function != nullptr) {
                     LOG(LL_DEBUG, LCF_HOOK, "Imported from lib %s symbol %s function : %p", libpath.c_str(), source, *function);
-                    return true;
+                    return *function;
                 }
             }
         }
@@ -84,7 +92,7 @@ bool link_function(void** function, const char* source, const char* library, con
 
                 /* Add the library to our set of libraries */
                 add_lib(library);
-                return true;
+                return *function;
             }
         }
     }
@@ -100,7 +108,7 @@ bool link_function(void** function, const char* source, const char* library, con
         ret = task_info(mach_task_self(), TASK_DYLD_INFO, (task_info_t)&dyld_info, &count);
         if (ret != KERN_SUCCESS) {
             LOG(LL_ERROR, LCF_HOOK, "Could not get task info");
-            return false;
+            return nullptr;
         }
         
         /* Get image array's size and address */
@@ -124,7 +132,7 @@ bool link_function(void** function, const char* source, const char* library, con
                     dlclose(handle);
                     if (*function != nullptr) {
                         LOG(LL_DEBUG, LCF_HOOK, "Imported from mach lib %s symbol %s function: %p", image.imageFilePath, source, *function);
-                        return true;
+                        return *function;
                     }
                 }
             }
@@ -135,7 +143,7 @@ bool link_function(void** function, const char* source, const char* library, con
     LOG(LL_ERROR, LCF_HOOK, "Could not import symbol %s", source);
 
     *function = nullptr;
-    return false;
+    return nullptr;
 }
 
 }

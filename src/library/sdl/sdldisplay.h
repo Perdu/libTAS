@@ -22,7 +22,8 @@
 
 #include "hook.h"
 
-#include <SDL2/SDL.h>
+#include "../external/SDL2.h"
+#include "../external/SDL3.h"
 
 namespace libtas {
 
@@ -50,7 +51,7 @@ OVERRIDE const char *SDL_GetDisplayName(int displayIndex);
  *
  *  \sa SDL_GetNumVideoDisplays()
  */
-OVERRIDE int SDL_GetDisplayBounds(int displayIndex, SDL_Rect * rect);
+OVERRIDE int SDL_GetDisplayBounds(int displayIndex, sdl2::SDL_Rect * rect);
 
 /**
  *  \brief Get the dots/pixels-per-inch for a display
@@ -81,7 +82,7 @@ OVERRIDE int SDL_GetDisplayDPI(int displayIndex, float * ddpi, float * hdpi, flo
  *  \sa SDL_GetDisplayBounds()
  *  \sa SDL_GetNumVideoDisplays()
  */
-OVERRIDE int SDL_GetDisplayUsableBounds(int displayIndex, SDL_Rect * rect);
+OVERRIDE int SDL_GetDisplayUsableBounds(int displayIndex, sdl2::SDL_Rect * rect);
 
 /**
  *  \brief Returns the number of available display modes.
@@ -101,17 +102,59 @@ OVERRIDE int SDL_GetNumDisplayModes(int displayIndex);
  *
  *  \sa SDL_GetNumDisplayModes()
  */
-OVERRIDE int SDL_GetDisplayMode(int displayIndex, int modeIndex, SDL_DisplayMode * mode);
+OVERRIDE int SDL_GetDisplayMode(int displayIndex, int modeIndex, sdl2::SDL_DisplayMode * mode);
 
 /**
  *  \brief Fill in information about the desktop display mode.
  */
-OVERRIDE int SDL_GetDesktopDisplayMode(int displayIndex, SDL_DisplayMode * mode);
+int sdl2::SDL_GetDesktopDisplayMode(int displayIndex, sdl2::SDL_DisplayMode * mode);
+
+/**
+ * Get information about the desktop's display mode.
+ *
+ * There's a difference between this function and SDL_GetCurrentDisplayMode()
+ * when SDL runs fullscreen and has changed the resolution. In that case this
+ * function will return the previous native display mode, and not the current
+ * display mode.
+ *
+ * \param displayID the instance ID of the display to query.
+ * \returns a pointer to the desktop display mode or NULL on failure; call
+ *          SDL_GetError() for more information.
+ *
+ * \threadsafety This function should only be called on the main thread.
+ *
+ * \since This function is available since SDL 3.2.0.
+ *
+ * \sa SDL_GetCurrentDisplayMode
+ * \sa SDL_GetDisplays
+ */
+const sdl3::SDL_DisplayMode * sdl3::SDL_GetDesktopDisplayMode(SDL_DisplayID displayID);
 
 /**
  *  \brief Fill in information about the current display mode.
  */
-OVERRIDE int SDL_GetCurrentDisplayMode(int displayIndex, SDL_DisplayMode * mode);
+int sdl2::SDL_GetCurrentDisplayMode(int displayIndex, sdl2::SDL_DisplayMode * mode);
+
+/**
+ * Get information about the current display mode.
+ *
+ * There's a difference between this function and SDL_GetDesktopDisplayMode()
+ * when SDL runs fullscreen and has changed the resolution. In that case this
+ * function will return the current display mode, and not the previous native
+ * display mode.
+ *
+ * \param displayID the instance ID of the display to query.
+ * \returns a pointer to the desktop display mode or NULL on failure; call
+ *          SDL_GetError() for more information.
+ *
+ * \threadsafety This function should only be called on the main thread.
+ *
+ * \since This function is available since SDL 3.2.0.
+ *
+ * \sa SDL_GetDesktopDisplayMode
+ * \sa SDL_GetDisplays
+ */
+const sdl3::SDL_DisplayMode * sdl3::SDL_GetCurrentDisplayMode(SDL_DisplayID displayID);
 
 /**
  *  \brief Get the closest match to the requested display mode.
@@ -134,7 +177,7 @@ OVERRIDE int SDL_GetCurrentDisplayMode(int displayIndex, SDL_DisplayMode * mode)
  *  \sa SDL_GetNumDisplayModes()
  *  \sa SDL_GetDisplayMode()
  */
-OVERRIDE SDL_DisplayMode *SDL_GetClosestDisplayMode(int displayIndex, const SDL_DisplayMode * mode, SDL_DisplayMode * closest);
+OVERRIDE sdl2::SDL_DisplayMode *SDL_GetClosestDisplayMode(int displayIndex, const sdl2::SDL_DisplayMode * mode, sdl2::SDL_DisplayMode * closest);
 
 /**
  *  \brief Get the display index associated with a window.
@@ -158,7 +201,7 @@ OVERRIDE int SDL_GetWindowDisplayIndex(SDL_Window * window);
  *  \sa SDL_GetWindowDisplayMode()
  *  \sa SDL_SetWindowFullscreen()
  */
-OVERRIDE int SDL_SetWindowDisplayMode(SDL_Window * window, const SDL_DisplayMode* mode);
+OVERRIDE int SDL_SetWindowDisplayMode(SDL_Window * window, const sdl2::SDL_DisplayMode* mode);
 
 /**
  *  \brief Fill in information about the display mode used when a fullscreen
@@ -167,7 +210,7 @@ OVERRIDE int SDL_SetWindowDisplayMode(SDL_Window * window, const SDL_DisplayMode
  *  \sa SDL_SetWindowDisplayMode()
  *  \sa SDL_SetWindowFullscreen()
  */
-OVERRIDE int SDL_GetWindowDisplayMode(SDL_Window * window, SDL_DisplayMode * mode);
+OVERRIDE int SDL_GetWindowDisplayMode(SDL_Window * window, sdl2::SDL_DisplayMode * mode);
 
 }
 
