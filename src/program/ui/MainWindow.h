@@ -1,5 +1,5 @@
 /*
-    Copyright 2015-2024 Clément Gallet <clement.gallet@ens-lyon.org>
+    Copyright 2015-2026 Clément Gallet <clement.gallet@ens-lyon.org>
 
     This file is part of libTAS.
 
@@ -54,9 +54,6 @@ class ExecutableWindow;
 class ControllerTabWindow;
 class GameInfoWindow;
 class GameSpecificWindow;
-class RamSearchWindow;
-class RamWatchWindow;
-class InputEditorWindow;
 class OsdWindow;
 class AnnotationsWindow;
 class AutoSaveWindow;
@@ -64,10 +61,13 @@ class TimeTraceWindow;
 class LuaConsoleWindow;
 class MovieSettingsWindow;
 class HexViewWindow;
+class WindowManager;
 
 class MainWindow : public QMainWindow
 {
     Q_OBJECT
+
+    friend class WindowManager;
 
 public:
     MainWindow(Context* c);
@@ -76,29 +76,12 @@ public:
     /* Capture the user closing the game and show a "save your work?" dialog */
     void closeEvent(QCloseEvent *event);
 
+    void showInputEditorWindow();
     void showLuaConsoleWindow();
 
     std::thread game_thread;
     GameLoop *gameLoop;
     Context *context;
-
-    SettingsWindow* settingsWindow;
-    EncodeWindow* encodeWindow;
-    InputWindow* inputWindow;
-    ExecutableWindow* executableWindow;
-    ControllerTabWindow* controllerTabWindow;
-    GameInfoWindow* gameInfoWindow;
-    GameSpecificWindow* gameSpecificWindow;
-    RamSearchWindow* ramSearchWindow;
-    RamWatchWindow* ramWatchWindow;
-    InputEditorWindow* inputEditorWindow;
-    OsdWindow* osdWindow;
-    AnnotationsWindow* annotationsWindow;
-    AutoSaveWindow* autoSaveWindow;
-    TimeTraceWindow* timeTraceWindow;
-    LuaConsoleWindow* luaConsoleWindow;
-    MovieSettingsWindow* movieSettingsWindow;
-    HexViewWindow* hexViewWindow;
 
     QList<QWidget*> disabledWidgetsOnStart;
     QList<QAction*> disabledActionsOnStart;
@@ -178,11 +161,23 @@ public:
     bool eventFilter(QObject *obj, QEvent *event);
 
 private:
+    WindowManager *windowManager;
+
     /* Update the status bar */
     void updateStatusBar();
 
     /* Update movie parameters from movie file */
     void updateMovieParams();
+
+    void updateFrequentRuntimeDisplay();
+    void updateMovieLoadedState(bool movieLoaded);
+    void reloadConfiguredWindows();
+    void updateRecentArgs();
+    bool updateGamePathAvailability();
+    void applyGamePathConfig();
+    void applyLaunchTimeSettings();
+    bool confirmDownloadsAllowed();
+    bool prepareLaunch(bool attach_gdb);
 
     /* Update the list of recent gamepaths */
     void updateRecentGamepaths();
@@ -202,6 +197,11 @@ private:
 
     /* Create the main window menus */
     void createMenus();
+    void createFileMenu();
+    void createSettingsMenu();
+    void createMovieMenu();
+    void createToolsMenu();
+    void createInputMenu();
 
     pid_t debugger_pid;
 
@@ -239,6 +239,12 @@ private slots:
     void slotLaunchGdb();
     void slotLaunchLldb();
     void slotLaunchStrace();
+    void slotSyncInputEditorVisible(bool &visible);
+    void slotFetchRamWatch(std::string &watch);
+    void slotFetchMarkerText(std::string &text);
+    void slotRegisterSavestate(int slot, unsigned long long frame);
+    void slotAddTimeTrace(int type, unsigned long long hash, std::string stacktrace);
+    void slotUpdateSettingsWindow(int status);
     void slotLaunch(bool attach_gdb);
     void slotStop();
     void slotBrowseGamePath();

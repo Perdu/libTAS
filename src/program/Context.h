@@ -1,5 +1,5 @@
 /*
-    Copyright 2015-2024 Clément Gallet <clement.gallet@ens-lyon.org>
+    Copyright 2015-2026 Clément Gallet <clement.gallet@ens-lyon.org>
 
     This file is part of libTAS.
 
@@ -31,6 +31,7 @@
 #endif
 #include <string>
 #include <stdint.h>
+#include <filesystem>
 
 struct Context {
     /* Execution status */
@@ -87,17 +88,17 @@ struct Context {
     Config config;
 
     /* Absolute path of libtas.so */
-    std::string libtaspath;
+    std::filesystem::path libtaspath;
 
     /* Absolute path of libtas32.so */
-    std::string libtas32path;
+    std::filesystem::path libtas32path;
 
     /* Absolute path of the game executable */
-    std::string gamepath;
+    std::filesystem::path gamepath;
 
     /* Absolute path of the real game binary to execute (which is different
      * from gamepath for .AppImage) */
-    std::string gameexecutable;
+    std::filesystem::path gameexecutable;
 
     /* Name of the game executable */
     std::string gamename;
@@ -122,9 +123,6 @@ struct Context {
 
     /* A frame number that we are seeking to */
     uint64_t seek_frame = 0;
-
-    /* Can we use incremental savestates? */
-    bool is_soft_dirty = false;
 
     /* MD5 hash of the game executable */
     std::string md5_game;

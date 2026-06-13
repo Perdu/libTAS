@@ -1,5 +1,5 @@
 /*
-    Copyright 2015-2024 Clément Gallet <clement.gallet@ens-lyon.org>
+    Copyright 2015-2026 Clément Gallet <clement.gallet@ens-lyon.org>
 
     This file is part of libTAS.
 
@@ -27,6 +27,7 @@ class MovieFile;
 class QComboBox;
 class ToolTipGroupBox;
 class QSpinBox;
+class QLineEdit;
 
 class MovieSettingsWindow : public QDialog {
     Q_OBJECT
@@ -40,6 +41,7 @@ private:
     
     MovieFile *movie;
 
+    QLineEdit *authorField;
     QComboBox *mouseSupportChoice;
     QComboBox *joystickSupportChoice;
 

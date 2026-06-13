@@ -1,5 +1,5 @@
 /*
-    Copyright 2015-2024 Clément Gallet <clement.gallet@ens-lyon.org>
+    Copyright 2015-2026 Clément Gallet <clement.gallet@ens-lyon.org>
 
     This file is part of libTAS.
 
@@ -95,7 +95,8 @@ int get_sdlversion(void)
     else if (sdl1 && sdl2) {
         dlclose(sdl1);
         dlclose(sdl2);
-        LOG(LL_ERROR, LCF_SDL | LCF_HOOK, "Multiple SDL versions were detected!");
+        LOG(LL_ERROR, LCF_SDL | LCF_HOOK, "Multiple SDL versions were detected! Taking SDL1 in priority");
+        SDLver = 1;
     }
     else {
         LOG(LL_ERROR, LCF_SDL | LCF_HOOK, "No SDL versions were detected!");

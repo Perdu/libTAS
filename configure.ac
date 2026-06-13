@@ -1,6 +1,6 @@
 dnl **** Initialization ****
 
-AC_INIT([libTAS], [1.4.7], [clement.gallet@ens-lyon.org])
+AC_INIT([libTAS], [1.4.8], [clement.gallet@ens-lyon.org])
 AM_INIT_AUTOMAKE([foreign subdir-objects])
 AC_PROG_CXX
 AC_CONFIG_SRCDIR([src/program/main.cpp])
@@ -35,9 +35,9 @@ case $host in
     ;;
 esac
 
-dnl Prefer C++20, fall back to C++17, then 14
+dnl Prefer C++20, fall back to C++17
 AC_LANG_PUSH([C++])
-for flag in -std=c++20 -std=c++17 -std=c++14; do
+for flag in -std=c++20 -std=c++17; do
   AC_MSG_CHECKING([whether $CXX supports $flag])
   save_CXXFLAGS="$CXXFLAGS"
   CXXFLAGS="$CXXFLAGS $flag"

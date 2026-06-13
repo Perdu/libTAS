@@ -1,5 +1,5 @@
 /*
-    Copyright 2015-2024 Clément Gallet <clement.gallet@ens-lyon.org>
+    Copyright 2015-2026 Clément Gallet <clement.gallet@ens-lyon.org>
 
     This file is part of libTAS.
 
@@ -48,9 +48,9 @@ InputEditorModel::InputEditorModel(Context* c, MovieFile* m, QObject *parent) : 
     connect(movie->inputs, &MovieFileInputs::inputsReset, this, &InputEditorModel::endResetInputs);
 
     paintOngoing = false;
-    undoTimeoutSec = 0;
-    undoTimer = new QTimer(this);
-    connect(undoTimer, &QTimer::timeout, this, &InputEditorModel::highlightUndo);
+    highlightTimeoutSec = 0;
+    highlightTimer = new QTimer(this);
+    connect(highlightTimer, &QTimer::timeout, this, &InputEditorModel::highlightUpdate);
 }
 
 unsigned int InputEditorModel::frameCount() const
@@ -65,7 +65,7 @@ int InputEditorModel::rowCount(const QModelIndex & /*parent*/) const
 
 int InputEditorModel::columnCount(const QModelIndex & /*parent*/) const
 {
-    return movie->editor->input_set.size() + COLUMN_SPECIAL_SIZE;
+    return movie->editor->input_set.size() + COLUMN_SPECIAL_SIZE + 1; // +1 for the add column
 }
 
 Qt::ItemFlags InputEditorModel::flags(const QModelIndex &index) const
@@ -77,6 +77,10 @@ Qt::ItemFlags InputEditorModel::flags(const QModelIndex &index) const
         return index_flags;
 
     if (index.column() < COLUMN_SPECIAL_SIZE)
+        return index_flags;
+
+    /* Skip add column */
+    if (index.column() == columnCount() - 1)
         return index_flags;
 
     /* Don't toggle past inputs before root savestate */
@@ -115,9 +119,11 @@ QVariant InputEditorModel::headerData(int section, Qt::Orientation orientation, 
     if (role == Qt::DisplayRole) {
         if (orientation == Qt::Horizontal) {
             if (section == COLUMN_SAVESTATE)
-                return QString(tr(""));
+                return QString("");
             if (section == COLUMN_FRAME)
                 return QString(tr("Frame"));
+            if (section == columnCount() - 1)
+                return QString("+");
             if (static_cast<unsigned int>(section-COLUMN_SPECIAL_SIZE) < movie->editor->input_set.size())
                 return QString(movie->editor->input_set[section-COLUMN_SPECIAL_SIZE].description.c_str());
         }
@@ -125,7 +131,7 @@ QVariant InputEditorModel::headerData(int section, Qt::Orientation orientation, 
     
     if (role == Qt::BackgroundRole) {
         if (orientation == Qt::Horizontal) {
-            if (section >= COLUMN_SPECIAL_SIZE) {
+            if (section >= COLUMN_SPECIAL_SIZE && section != (columnCount() - 1)) {
                 /* Main color */
                 QColor color = QGuiApplication::palette().window().color();
                 bool lightTheme = isLightTheme();
@@ -172,6 +178,9 @@ QVariant InputEditorModel::data(const QModelIndex &index, int role) const
     unsigned int row = index.row();
     unsigned int col = index.column();
     
+    if (col == columnCount() - 1)
+        return QVariant();
+
     if (role == Qt::TextAlignmentRole) {
         return Qt::AlignCenter;
     }
@@ -193,6 +202,9 @@ QVariant InputEditorModel::data(const QModelIndex &index, int role) const
             return QGuiApplication::palette().text();
         }
         if (col < COLUMN_SPECIAL_SIZE) {
+            return QGuiApplication::palette().text();
+        }
+        if (col == columnCount() - 1) {
             return QGuiApplication::palette().text();
         }
 
@@ -272,6 +284,9 @@ QVariant InputEditorModel::data(const QModelIndex &index, int role) const
         if (row >= frameCount())
             return QBrush(color);
             
+        if (col == columnCount() - 1)
+            return QBrush(color);
+
         bool lightTheme = isLightTheme();
         int r, g, b;
         color.getRgb(&r, &g, &b, nullptr);
@@ -370,20 +385,25 @@ QVariant InputEditorModel::data(const QModelIndex &index, int role) const
         if (savestate_frame != -1)
             color = color.darker(105);
 
-        /* Highlight last undo/redo */
-        if (undoTimeoutSec > 0.0f) {
-            if (row >= undoMinRow && row <= undoMaxRow &&
-                col >= undoMinCol && col <= undoMaxCol) {
+        /* Highlight cells */
+        if (highlightTimeoutSec > 0.0f) {
+            if (row >= highlightMinRow && row <= highlightMaxRow &&
+                col >= highlightMinCol && col <= highlightMaxCol) {
                 
                 int r, g, b;
                 color.getRgb(&r, &g, &b, nullptr);
 
-                if (isLightTheme()) {
-                    color.setRgb(r-60.0f*undoTimeoutSec, g-60.0f*undoTimeoutSec, b);
+                if (highlightValid) {
+                    r = r - lightTheme * (60.0f*highlightTimeoutSec);
+                    g = g - lightTheme * (60.0f*highlightTimeoutSec);
+                    b = b + (!lightTheme) * (60.0f*highlightTimeoutSec);
                 }
                 else {
-                    color.setRgb(r, g, b+60.0f*undoTimeoutSec);
+                    r = r + (!lightTheme) * (60.0f*highlightTimeoutSec);
+                    g = g - lightTheme * (60.0f*highlightTimeoutSec);
+                    b = b - lightTheme * (60.0f*highlightTimeoutSec);                    
                 }
+                color.setRgb(r, g, b);
             }
         }
 
@@ -537,6 +557,9 @@ bool InputEditorModel::setData(const QModelIndex &index, const QVariant &value, 
         if (index.column() < COLUMN_SPECIAL_SIZE)
             return false;
 
+        if (index.column() == columnCount() - 1)
+            return false;
+
         const SingleInput si = movie->editor->input_set[index.column()-COLUMN_SPECIAL_SIZE];
 
         /* Don't edit locked input */
@@ -551,8 +574,10 @@ bool InputEditorModel::setData(const QModelIndex &index, const QVariant &value, 
         /* Rewind to past frame is needed */
         if (row < context->framecount) {
             bool ret = rewind(row);
-            if (!ret)
+            if (!ret) {
+                startHighlight(row, row, index.column(), index.column(), false);
                 return false;
+            }
         }
 
         const AllInputs& ai = movie->inputs->getInputs(row);
@@ -645,6 +670,9 @@ void InputEditorModel::startPaint(int col, int minRow, int maxRow, int value, in
 {
     if (col < COLUMN_SPECIAL_SIZE)
         return;
+
+    if (col == columnCount() - 1)
+        return;
         
     paintInput = movie->editor->input_set[col-COLUMN_SPECIAL_SIZE];
 
@@ -655,6 +683,7 @@ void InputEditorModel::startPaint(int col, int minRow, int maxRow, int value, in
     paintOngoing = true;
     paintMinRow = minRow;
     paintMaxRow = maxRow;
+    paintCol = col;
     paintValue = value;
     if (autofire >= 0)
         paintAutofire = autofire;
@@ -672,6 +701,7 @@ void InputEditorModel::endPaint()
             /* Try rewinding to the earliest frame possible and paint what is possible */
             uint64_t root_frame = SaveStateList::rootStateFramecount();
             if (root_frame > paintMaxRow) {
+                startHighlight(paintMinRow, paintMaxRow, paintCol, paintCol, false);
                 paintOngoing = false;
                 return;
             }
@@ -679,6 +709,7 @@ void InputEditorModel::endPaint()
                 paintMinRow = root_frame;
             ret = rewind(root_frame);
             if (!ret) {
+                startHighlight(paintMinRow, paintMaxRow, paintCol, paintCol, false);
                 paintOngoing = false;
                 return;
             }
@@ -712,12 +743,18 @@ std::string InputEditorModel::inputLabel(int column)
     if (column < COLUMN_SPECIAL_SIZE)
         return "";
 
+    if (column == columnCount() - 1)
+        return "";
+
     return movie->editor->input_set[column-COLUMN_SPECIAL_SIZE].description;
 }
 
 void InputEditorModel::renameLabel(int column, std::string label)
 {
     if (column < COLUMN_SPECIAL_SIZE)
+        return;
+
+    if (column == columnCount() - 1)
         return;
 
     /* Don't change label if it has only whitespaces */
@@ -732,6 +769,9 @@ void InputEditorModel::renameLabel(int column, std::string label)
 std::string InputEditorModel::inputDescription(int column)
 {
     if (column < COLUMN_SPECIAL_SIZE)
+        return "";
+
+    if (column == columnCount() - 1)
         return "";
 
     SingleInput si = movie->editor->input_set[column-COLUMN_SPECIAL_SIZE];
@@ -753,6 +793,9 @@ bool InputEditorModel::isInputAnalog(int column)
     if (column < COLUMN_SPECIAL_SIZE)
         return false;
 
+    if (column == columnCount() - 1)
+        return false;
+
     const SingleInput si = movie->editor->input_set[column-COLUMN_SPECIAL_SIZE];
     return si.isAnalog();
 }
@@ -768,6 +811,7 @@ bool InputEditorModel::insertRows(int row, int count, bool duplicate, const QMod
     if (row < static_cast<int>(context->framecount)) {
         bool ret = rewind(row);
         if (!ret) {
+            startHighlight(row, row+count-1, 0, columnCount()-1, false);
             return 0;
         }
     }
@@ -793,6 +837,7 @@ bool InputEditorModel::removeRows(int row, int count, const QModelIndex &parent)
     if (row < static_cast<int>(context->framecount)) {
         bool ret = rewind(row);
         if (!ret) {
+            startHighlight(row, row+count-1, 0, columnCount()-1, false);
             return 0;
         }
     }
@@ -830,6 +875,7 @@ int InputEditorModel::pasteInputs(int row)
     if (row < static_cast<int>(context->framecount)) {
         bool ret = rewind(row);
         if (!ret) {
+            startHighlight(row, row, 0, columnCount()-1, false);
             return 0;
         }
     }
@@ -858,6 +904,7 @@ void InputEditorModel::pasteInputsInRange(int row, int count)
     if (row < static_cast<int>(context->framecount)) {
         bool ret = rewind(row);
         if (!ret) {
+            startHighlight(row, row+count-1, 0, columnCount()-1, false);
             return;
         }
     }
@@ -884,6 +931,7 @@ int InputEditorModel::pasteInsertInputs(int row)
     if (row < static_cast<int>(context->framecount)) {
         bool ret = rewind(row);
         if (!ret) {
+            startHighlight(row, row, 0, columnCount()-1, false);
             return 0;
         }
     }
@@ -982,6 +1030,9 @@ void InputEditorModel::clearUniqueInput(int column)
     if (column < COLUMN_SPECIAL_SIZE)
         return;
 
+    if (column == columnCount() - 1)
+        return;
+
     SingleInput si = movie->editor->input_set[column-COLUMN_SPECIAL_SIZE];
 
     /* Don't clear locked input */
@@ -994,6 +1045,9 @@ void InputEditorModel::clearUniqueInput(int column)
 bool InputEditorModel::removeUniqueInput(int column)
 {
     if (column < COLUMN_SPECIAL_SIZE)
+        return false;
+
+    if (column == columnCount() - 1)
         return false;
 
     SingleInput si = movie->editor->input_set[column-COLUMN_SPECIAL_SIZE];
@@ -1025,6 +1079,9 @@ void InputEditorModel::columnFactor(int column, double factor)
     if (column < COLUMN_SPECIAL_SIZE)
         return;
 
+    if (column == columnCount() - 1)
+        return;
+
     SingleInput si = movie->editor->input_set[column-COLUMN_SPECIAL_SIZE];
 
     std::vector<int> new_values;
@@ -1043,6 +1100,9 @@ bool InputEditorModel::isLockedUniqueInput(int column)
     if (column < COLUMN_SPECIAL_SIZE)
         return false;
 
+    if (column == columnCount() - 1)
+        return false;
+
     SingleInput si = movie->editor->input_set[column-COLUMN_SPECIAL_SIZE];
 
     if (movie->editor->locked_inputs.find(si) != movie->editor->locked_inputs.end())
@@ -1055,6 +1115,9 @@ bool InputEditorModel::isLockedUniqueInput(int column)
 void InputEditorModel::lockUniqueInput(int column, bool locked)
 {
     if (column < COLUMN_SPECIAL_SIZE)
+        return;
+
+    if (column == columnCount() - 1)
         return;
 
     SingleInput si = movie->editor->input_set[column-COLUMN_SPECIAL_SIZE];
@@ -1077,11 +1140,27 @@ void InputEditorModel::clearInputs(int min_row, int max_row)
     if (min_row < static_cast<int>(context->framecount)) {
         bool ret = rewind(min_row);
         if (!ret) {
+            startHighlight(min_row, max_row, 0, columnCount()-1, false);
             return;
         }
     }
 
     movie->inputs->clearInputs(min_row, max_row);
+}
+
+void InputEditorModel::startHighlight(int minRow, int maxRow, int minCol, int maxCol, bool valid)
+{
+    /* Detect undo/redo operation */
+    // if (!movie->changelog->is_recording) {
+        highlightMinRow = minRow;
+        highlightMaxRow = maxRow;
+        highlightMinCol = minCol;
+        highlightMaxCol = maxCol;
+        highlightValid = valid;
+        highlightTimeoutSec = maxHighlightTimeoutSec;
+        highlightStart = std::chrono::steady_clock::now();
+        highlightTimer->start(50);
+    // }
 }
 
 void InputEditorModel::beginResetInputs()
@@ -1109,16 +1188,7 @@ void InputEditorModel::endInsertInputs(int minRow, int maxRow)
     /* We have to check if new inputs were added */
     addUniqueInputs(minRow, maxRow);
     
-    /* Detect undo/redo operation */
-    // if (!movie->changelog->is_recording) {
-        undoMinRow = minRow;
-        undoMaxRow = maxRow;
-        undoMinCol = 0;
-        undoMaxCol = columnCount()-1;
-        undoTimeoutSec = maxUndoTimeoutSec;
-        undoStart = std::chrono::steady_clock::now();
-        undoTimer->start(50);
-    // }
+    startHighlight(minRow, maxRow, 0, columnCount()-2, true);
 }
 
 void InputEditorModel::beginEditInputs(int minRow, int maxRow)
@@ -1127,21 +1197,12 @@ void InputEditorModel::beginEditInputs(int minRow, int maxRow)
 
 void InputEditorModel::endEditInputs(int minRow, int maxRow)
 {
-    emit dataChanged(index(minRow,0), index(maxRow,columnCount()-1));
+    emit dataChanged(index(minRow,0), index(maxRow,columnCount()-2));
 
     /* We have to check if new inputs were added */
     addUniqueInputs(minRow, maxRow);
-    
-    /* Detect undo/redo operation */
-    // if (!movie->changelog->is_recording) {
-        undoMinRow = minRow;
-        undoMaxRow = maxRow;
-        undoMinCol = 0;
-        undoMaxCol = columnCount()-1;
-        undoTimeoutSec = maxUndoTimeoutSec;
-        undoStart = std::chrono::steady_clock::now();
-        undoTimer->start(50);
-    // }
+
+    startHighlight(minRow, maxRow, 0, columnCount()-2, true);
 }
 
 void InputEditorModel::beginRemoveInputs(int minRow, int maxRow)
@@ -1153,40 +1214,31 @@ void InputEditorModel::endRemoveInputs(int minRow, int maxRow)
 {
     endRemoveRows();
 
-    /* Detect undo/redo operation */
-    // if (!movie->changelog->is_recording) {
-        undoMinRow = std::min(minRow, rowCount()-1);
-        undoMaxRow = std::min(maxRow, rowCount()-1);
-        undoMinCol = 0;
-        undoMaxCol = 1; // Show removed rows by only highlight first cols
-        undoTimeoutSec = maxUndoTimeoutSec;
-        undoStart = std::chrono::steady_clock::now();
-        undoTimer->start(50);
-    // }
+    highlightValid = true;
+    startHighlight(minRow, maxRow, 0, 1, true);
 }
 
 void InputEditorModel::update()
 {
     static uint64_t last_framecount = 0;
     if (context->framecount != last_framecount) {
-        emit dataChanged(index(context->framecount,0), index(context->framecount,columnCount()-1));
-        emit dataChanged(index(last_framecount,0), index(last_framecount,columnCount()-1));
+        emit dataChanged(index(context->framecount,0), index(context->framecount,columnCount()-2));
+        emit dataChanged(index(last_framecount,0), index(last_framecount,columnCount()-2));
         last_framecount = context->framecount;
     }
 }
 
-void InputEditorModel::highlightUndo()
+void InputEditorModel::highlightUpdate()
 {
-    /* Highlight last undo/redo operation */
-    if (undoTimeoutSec > 0.0f) {
-        const auto undoEnd = std::chrono::steady_clock::now();
-        const std::chrono::duration<float> undoDiff = undoEnd - undoStart;
-        undoTimeoutSec = std::min(undoTimeoutSec, maxUndoTimeoutSec - undoDiff.count());
+    if (highlightTimeoutSec > 0.0f) {
+        const auto highlightEnd = std::chrono::steady_clock::now();
+        const std::chrono::duration<float> highlightDiff = highlightEnd - highlightStart;
+        highlightTimeoutSec = std::min(highlightTimeoutSec, maxHighlightTimeoutSec - highlightDiff.count());
         
-        emit dataChanged(index(undoMinRow,undoMinCol), index(undoMaxRow,undoMaxCol));
+        emit dataChanged(index(highlightMinRow,highlightMinCol), index(highlightMaxRow,highlightMaxCol));
     }
     else
-        undoTimer->stop();
+        highlightTimer->stop();
 }
 
 /* Register a savestate. If saved, frame contains the framecount of the
@@ -1214,9 +1266,9 @@ void InputEditorModel::registerSavestate(int slot, unsigned long long frame)
         return;
         
     if (oldRoot < newRoot)
-        emit dataChanged(index(oldRoot,0), index(newRoot,columnCount()-1));
+        emit dataChanged(index(oldRoot,0), index(newRoot,columnCount()-2));
     else
-        emit dataChanged(index(newRoot,0), index(oldRoot,columnCount()-1));
+        emit dataChanged(index(newRoot,0), index(oldRoot,columnCount()-2));
 }
 
 void InputEditorModel::moveInputs(int oldIndex, int newIndex)
@@ -1333,6 +1385,9 @@ void InputEditorModel::setAutoholdInput(int column, bool checked)
     if (column < COLUMN_SPECIAL_SIZE)
         return;
 
+    if (column == columnCount() - 1)
+        return;
+
     movie->editor->setAutohold(column-COLUMN_SPECIAL_SIZE, checked);
 
     emit dataChanged(index(0,column), index(rowCount(),column), QVector<int>(1, Qt::BackgroundRole));
@@ -1344,12 +1399,18 @@ bool InputEditorModel::isAutoholdInput(int column) const
     if (column < COLUMN_SPECIAL_SIZE)
         return false;
 
+    if (column == columnCount() - 1)
+        return false;
+
     return movie->editor->isAutohold(column-COLUMN_SPECIAL_SIZE);
 }
 
 void InputEditorModel::setAutofireInput(int column, bool checked)
 {
     if (column < COLUMN_SPECIAL_SIZE)
+        return;
+
+    if (column == columnCount() - 1)
         return;
 
     movie->editor->setAutofire(column-COLUMN_SPECIAL_SIZE, checked);

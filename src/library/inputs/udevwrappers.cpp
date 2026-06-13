@@ -1,5 +1,5 @@
 /*
-    Copyright 2015-2024 Clément Gallet <clement.gallet@ens-lyon.org>
+    Copyright 2015-2026 Clément Gallet <clement.gallet@ens-lyon.org>
 
     This file is part of libTAS.
 
@@ -166,7 +166,7 @@ public:
     size_type find_last_of(value_type value) const { return rfind(value); }
     size_type find_last_of(const String &string) const {
         auto pos = std::find_first_of(crbegin(), crend(), string.crbegin(), string.crend());
-        return pos != crend() ? length() - string.length() - std::distance(crbegin(), pos) : npos;
+        return pos != crend() ? length() - 1 - std::distance(crbegin(), pos) : npos;
     }
     size_type find_last_not_of(value_type value) const {
         auto pos = std::find_if_not(crbegin(), crend(), [value](value_type cur) {

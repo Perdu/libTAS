@@ -1,5 +1,5 @@
 /*
-    Copyright 2015-2024 Clément Gallet <clement.gallet@ens-lyon.org>
+    Copyright 2015-2026 Clément Gallet <clement.gallet@ens-lyon.org>
 
     This file is part of libTAS.
 
@@ -166,7 +166,7 @@ struct __attribute__((packed, aligned(8))) SharedConfig {
         DEBUG_NATIVE_INET = 0x10, // Allow game to access the internet
     };
 
-    int debug_state = 0;
+    int debug_state = DEBUG_NATIVE_INET;
 
     /* An enum indicating which lang are we enforcing */
     enum LocaleType
@@ -313,8 +313,13 @@ struct __attribute__((packed, aligned(8))) SharedConfig {
     /* Force Mesa software OpenGL driver */
     bool opengl_soft = true;
 
-    /* Enable OpenGL performance tweaks */
-    bool opengl_performance = false;
+    /* OpenGL quality level for software rendering optimization */
+    enum OpenGLQuality {
+        OPENGL_QUALITY_NORMAL,   // No optimization
+        OPENGL_QUALITY_FAST,     // Moderate optimization
+        OPENGL_QUALITY_FASTEST   // Aggressive optimization
+    };
+    int opengl_quality = OPENGL_QUALITY_NORMAL;
 
     /* Tries to detect busy loops and advance time */
     bool busyloop_detection = false;
@@ -324,12 +329,6 @@ struct __attribute__((packed, aligned(8))) SharedConfig {
 
     /* Call raise(SIGINT) in libtas::init */
     bool sigint_upon_launch = false;
-
-    /* Indicate if clone3 set tid feature is supported */
-    bool has_clone3_set_tid = false;
-    
-    /* Indicate if process can write into /proc/sys/kernel/ns_last_pid */
-    bool can_set_last_pid = false;
 };
 
 #endif

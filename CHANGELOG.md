@@ -1,9 +1,17 @@
 ## [Unreleased]
 ### Added
+### Changed
+### Fixed
+
+## [1.4.8] - 2026-05-14
+### Added
 
 * Debug window for file descriptors
 * File Debug OSD shows all files with types
 * Hook SDL_SetWindowResizable to avoid a window resize call (fix #700)
+* Input editor: highlight failed edit in red (#705)
+* Improve realtime playback target fps
+* Input editor: Add a "+" column
 
 ### Changed
 
@@ -21,6 +29,9 @@
 * Fix lua script getting activated when modified (fix #692)
 * gui.pixel() now actually draws a pixel (fix #691)
 * Fix encoding softlock when resolution has changed (fix #689)
+* Fix Paths settings not saved
+* Fix a crash when fastforwarding under Vulkan
+* Fix desync in GM:S startup due to missing event mask (#695)
 
 ## [1.4.7] - 2025-10-06
 ### Added

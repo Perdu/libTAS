@@ -1,5 +1,5 @@
 /*
-    Copyright 2015-2024 Clément Gallet <clement.gallet@ens-lyon.org>
+    Copyright 2015-2026 Clément Gallet <clement.gallet@ens-lyon.org>
 
     This file is part of libTAS.
 
@@ -976,6 +976,16 @@ static void Helper_PreloadManager_WaitForQueueToProcess(PreloadManager* m, Prelo
                 if (pending_queue_empty)
                     break;
 
+                if (o) {
+                    U6_PreloadManagerOperation* o6 = reinterpret_cast<U6_PreloadManagerOperation*>(o);
+                    bool wait_loading = !(o6->CanPerformWhileObjectsLoading(o));
+                    int loading_size = *(int *)(m + 0x310);
+                    if (wait_loading && (loading_size > 0)) {
+                        LOG(LL_WARN, LCF_HACKS | LCF_FILEIO, "    exiting wait because of cannot perform while loading");
+                        break;
+                    }
+                }
+                
                 /* Get the currently processed operation */
                 long active_list_size = *(long *)(m + 0x348);
                 if (active_list_size > 0) {
@@ -998,7 +1008,36 @@ static void Helper_PreloadManager_WaitForQueueToProcess(PreloadManager* m, Prelo
         NATIVECALL(usleep(1000));
     }
     if (i == 4000) {
-        LOG(LL_WARN, LCF_HACKS | LCF_FILEIO, "    timeout waiting for operation to be processed by Loading.Preload thread");
+        LOG(LL_WARN, LCF_HACKS | LCF_FILEIO, "    timeout waiting for operation %p to be processed by Loading.Preload thread", o);
+        if (GetUnityVersionMaj() == 6000) {
+            if (o) {
+                LOG(LL_WARN, LCF_HACKS | LCF_FILEIO, "    operation status: queued");
+                int operation_status = *(int *)(o + 0x40);
+                switch (operation_status) {
+                    case 0:
+                        LOG(LL_WARN, LCF_HACKS | LCF_FILEIO, "    operation status: queued");
+                        break;
+                    case 1:
+                        LOG(LL_WARN, LCF_HACKS | LCF_FILEIO, "    operation status: active");
+                        break;
+                    case 2:
+                        LOG(LL_WARN, LCF_HACKS | LCF_FILEIO, "    operation status: done");
+                        break;
+                    default:
+                        LOG(LL_WARN, LCF_HACKS | LCF_FILEIO, "    operation status: invalid");
+                }
+                
+                U6_PreloadManagerOperation* o6 = reinterpret_cast<U6_PreloadManagerOperation*>(o);
+                LOG(LL_WARN, LCF_HACKS | LCF_FILEIO, "    GetAllowSceneActivation: %d", o6->GetAllowSceneActivation(o));
+                LOG(LL_WARN, LCF_HACKS | LCF_FILEIO, "    MustCompleteNextFrame: %d", o6->MustCompleteNextFrame(o));
+                LOG(LL_WARN, LCF_HACKS | LCF_FILEIO, "    CanLoadObjects: %d", o6->CanLoadObjects(o));
+                LOG(LL_WARN, LCF_HACKS | LCF_FILEIO, "    CanPerformWhileObjectsLoading: %d", o6->CanPerformWhileObjectsLoading(o));
+                LOG(LL_WARN, LCF_HACKS | LCF_FILEIO, "    GetAllowParallelExecution: %d", o6->GetAllowParallelExecution(o));
+            }
+            
+            LOG(LL_WARN, LCF_HACKS | LCF_FILEIO, "    size of queued operations: %d", *(int *)(m + 0x328));
+            LOG(LL_WARN, LCF_HACKS | LCF_FILEIO, "    size of active operations: %d", *(int *)(m + 0x348));
+        }
     }
 }
 
@@ -1392,7 +1431,9 @@ void UnityHacks::patch(int func, uint64_t addr)
         FUNC_CASE(UNITY5_JOBQUEUE_SCHEDULE_GROUPS, U5_JobQueue_ScheduleGroups)
         FUNC_CASE(UNITY5_JOBQUEUE_WAIT_JOB_GROUP, U5_JobQueue_WaitForJobGroup)
         FUNC_CASE(UNITY5_JOBQUEUE_WAIT_JOB_GROUP_ID, U5_JobQueue_WaitForJobGroupID)
+        /* Use the same function for both symbols, because they have the same behavior */
         FUNC_CASE(UNITY5_JOBQUEUE_HAS_JOB_COMPLETED, U5_JobQueue_HasJobGroupIDCompleted)
+        FUNC_CASE(UNITY5_JOBQUEUE_HAS_JOB_ID_COMPLETED, U5_JobQueue_HasJobGroupIDCompleted)
         
         FUNC_CASE(UNITY2K_BACKGROUND_JOBQUEUE_SCHEDULE, U2K_BackgroundJobQueue_ScheduleJobInternal)
         FUNC_CASE(UNITY2K_BACKGROUND_JOBQUEUE_SCHEDULE_MAIN, U2K_BackgroundJobQueue_ScheduleMainThreadJobInternal)

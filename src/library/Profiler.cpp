@@ -1,5 +1,5 @@
 /*
-    Copyright 2015-2024 Clément Gallet <clement.gallet@ens-lyon.org>
+    Copyright 2015-2026 Clément Gallet <clement.gallet@ens-lyon.org>
 
     This file is part of libTAS.
 
@@ -47,8 +47,8 @@ Profiler::ScopeInfo& Profiler::Database::initNode(const char* label, int type, c
     };
 
     nextNodeId = (nextNodeId+1) % maxNodes;
-    if (nextNodeId > maxNodeId)
-        maxNodeId = nextNodeId;
+    if (maxNodeId < maxNodes)
+        maxNodeId++;
 
     return nodes[id];
 }

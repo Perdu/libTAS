@@ -1,5 +1,5 @@
 /*
-    Copyright 2015-2024 Clément Gallet <clement.gallet@ens-lyon.org>
+    Copyright 2015-2026 Clément Gallet <clement.gallet@ens-lyon.org>
 
     This file is part of libTAS.
 
@@ -36,10 +36,10 @@
 #include "../shared/inputs/MiscInputs.h"
 #include "../shared/inputs/MouseInputs.h"
 
-#include <QtCore/QSettings>
 #include <iostream>
 #include <sstream>
 #include <algorithm>
+#include <filesystem>
 
 MovieFileInputs::MovieFileInputs(Context* c) : context(c)
 {
@@ -88,7 +88,7 @@ void MovieFileInputs::load(int savestate)
     input_list.clear();
     
     /* Open the input file and parse each line to fill our input list */
-    std::string input_file = context->config.tempmoviedir + "/inputs";
+    std::filesystem::path input_file = context->config.tempmoviedir / "inputs";
     if (savestate > 0) {
         input_file += std::to_string(savestate);
     }
@@ -106,7 +106,7 @@ void MovieFileInputs::load(int savestate)
 void MovieFileInputs::save()
 {
     /* Format and write input frames into the input file */
-    std::string input_file = context->config.tempmoviedir + "/inputs";
+    std::filesystem::path input_file = context->config.tempmoviedir / "inputs";
     std::ofstream input_stream(input_file, std::ofstream::trunc);
 
     InputSerialization::writeInputs(input_stream, input_list);

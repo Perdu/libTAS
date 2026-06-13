@@ -1,5 +1,5 @@
 /*
-    Copyright 2015-2024 Clément Gallet <clement.gallet@ens-lyon.org>
+    Copyright 2015-2026 Clément Gallet <clement.gallet@ens-lyon.org>
 
     This file is part of libTAS.
 
@@ -36,13 +36,15 @@ public:
     void update();
     void update_frozen();
 
-    PointerScanWindow *pointerScanWindow;
     RamWatchView *ramWatchView;
 
 private:
     Context *context;
     QString defaultPath; // Latest saved/loaded watch file used at default
     HexViewWindow* hexViewWindow;
+    PointerScanWindow *pointerScanWindow = nullptr;
+
+    PointerScanWindow *ensurePointerScanWindow();
 
 public slots:
 

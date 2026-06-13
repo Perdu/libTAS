@@ -1,5 +1,5 @@
 /*
-    Copyright 2015-2024 Clément Gallet <clement.gallet@ens-lyon.org>
+    Copyright 2015-2026 Clément Gallet <clement.gallet@ens-lyon.org>
 
     This file is part of libTAS.
 
@@ -143,6 +143,11 @@ void setDynapiAddr(uint64_t addr)
 
     char* libtaspath;
     NATIVECALL(libtaspath = getenv("SDL_DYNAMIC_API"));
+    if (libtaspath == nullptr) {
+        LOG(LL_ERROR, LCF_SDL, "   SDL_DYNAMIC_API is not set, cannot resolve libtas SDL dynapi hooks");
+        return 1;
+    }
+
     void *libtaslib;
     NATIVECALL(libtaslib = dlopen(libtaspath, RTLD_LAZY | RTLD_NOLOAD));
     if (libtaslib == nullptr) {

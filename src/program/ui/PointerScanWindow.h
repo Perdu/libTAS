@@ -1,5 +1,5 @@
 /*
-    Copyright 2015-2024 Clément Gallet <clement.gallet@ens-lyon.org>
+    Copyright 2015-2026 Clément Gallet <clement.gallet@ens-lyon.org>
 
     This file is part of libTAS.
 
@@ -34,18 +34,20 @@
 /* Forward declaration */
 struct Context;
 class PointerScanModel;
+class RamWatchWindow;
 
 class PointerScanWindow : public QDialog {
     Q_OBJECT
 
 public:
-    PointerScanWindow(Context *c, QWidget *parent = Q_NULLPTR);
+    PointerScanWindow(Context *c, RamWatchWindow *ramWatchWindow, QWidget *parent = Q_NULLPTR);
 
     QLineEdit *addressInput;
     int type_index;
     
 private:
     Context *context;
+    RamWatchWindow *ramWatchWindow;
     QTableView *pointerScanView;
     QSortFilterProxyModel* proxyModel;
 

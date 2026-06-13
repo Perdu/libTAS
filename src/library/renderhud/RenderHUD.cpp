@@ -1,5 +1,5 @@
 /*
-    Copyright 2015-2024 Clément Gallet <clement.gallet@ens-lyon.org>
+    Copyright 2015-2026 Clément Gallet <clement.gallet@ens-lyon.org>
 
     This file is part of libTAS.
 
@@ -61,8 +61,6 @@ bool RenderHUD::init()
         if (!XlibGameWindow::get())
             return false;
         
-        setWindowResizable(supportsLargerViewport());
-
         /* TODO: select one display? */
         for (int i=0; i<GAMEDISPLAYNUM; i++) {
             if (x11::gameDisplays[i]) {
@@ -143,7 +141,7 @@ void RenderHUD::drawAll(uint64_t framecount, uint64_t nondraw_framecount, const 
 
     /* Show game window if backend supports it */
     /* Must be placed **before** offering the option to enable/disable it */
-    if (renderGameWindow() && ScreenCapture::isInited()) {
+    if (renderGameWindow() && ScreenCapture::isInited() && w > 0 && h > 0) {
         /* Create the window that will hold the game texture */
 
         /* Remove padding so that the texture is aligned with the window */
@@ -159,7 +157,7 @@ void RenderHUD::drawAll(uint64_t framecount, uint64_t nondraw_framecount, const 
             
             game_window_x = pos.x;
             game_window_y = pos.y;
-            game_window_scale = avail_size.x / w;
+            game_window_scale = avail_size.x / static_cast<float>(w);
             
             ImGui::GetWindowDrawList()->AddImage(
                 reinterpret_cast<void*>(ScreenCapture::screenTexture()), 
@@ -227,13 +225,19 @@ void RenderHUD::drawAll(uint64_t framecount, uint64_t nondraw_framecount, const 
         show_watches = false;
     }
     
-    if (supportsGameWindow() && !show_game_window && old_show_game_window) {
-        /* Resize game window to their native dimensions */
-        /* TODO: select one display? */
-        for (int i=0; i<GAMEDISPLAYNUM; i++) {
-            if (x11::gameDisplays[i]) {
-                NATIVECALL(XResizeWindow (x11::gameDisplays[i], XlibGameWindow::get(), w, h));
-                break;
+    if (supportsGameWindow()) {
+        if (show_game_window && !old_show_game_window) {
+            setWindowResizable(true);
+        }
+        if (!show_game_window && old_show_game_window) {
+            setWindowResizable(false);
+            /* Resize game window to their native dimensions */
+            /* TODO: select one display? */
+            for (int i=0; i<GAMEDISPLAYNUM; i++) {
+                if (x11::gameDisplays[i]) {
+                    NATIVECALL(XResizeWindow (x11::gameDisplays[i], XlibGameWindow::get(), w, h));
+                    break;
+                }
             }
         }
     }

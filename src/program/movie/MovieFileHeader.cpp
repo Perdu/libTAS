@@ -1,5 +1,5 @@
 /*
-    Copyright 2015-2024 Clément Gallet <clement.gallet@ens-lyon.org>
+    Copyright 2015-2026 Clément Gallet <clement.gallet@ens-lyon.org>
 
     This file is part of libTAS.
 
@@ -39,10 +39,9 @@ void MovieFileHeader::clear()
 void MovieFileHeader::load()
 {
     /* Load the config file into the context struct */
-    QString configfile = context->config.tempmoviedir.c_str();
-    configfile += "/config.ini";
+    std::filesystem::path configfile = context->config.tempmoviedir / "config.ini";
 
-    QSettings config(configfile, QSettings::IniFormat);
+    QSettings config(QString(configfile.c_str()), QSettings::IniFormat);
     config.setFallbacksEnabled(false);
 
     context->config.sc.movie_framecount = config.value("frame_count").toULongLong();
@@ -50,11 +49,11 @@ void MovieFileHeader::load()
         context->config.sc.mouse_support = config.value("mouse_support").toBool();
 
         context->config.sc.nb_controllers = config.value("nb_controllers").toInt();
-        if (! context->config.sc.initial_time_set_via_cli) {
+        if (! context->config.initial_time_set_via_cli) {
             context->config.sc.initial_time_sec = config.value("initial_time_sec").toLongLong();
             context->config.sc.initial_time_nsec = config.value("initial_time_nsec").toLongLong();
         }
-        if (! context->config.sc.initial_monotonic_time_set_via_cli) {
+        if (! context->config.initial_monotonic_time_set_via_cli) {
             context->config.sc.initial_monotonic_time_sec = config.value("initial_monotonic_time_sec").toLongLong();
             context->config.sc.initial_monotonic_time_nsec = config.value("initial_monotonic_time_nsec").toLongLong();
         }
@@ -104,10 +103,9 @@ void MovieFileHeader::load()
 void MovieFileHeader::loadSavestate()
 {
     /* Load the config file into the context struct */
-    QString configfile = context->config.tempmoviedir.c_str();
-    configfile += "/config.ini";
+    std::filesystem::path configfile = context->config.tempmoviedir / "config.ini";
 
-    QSettings config(configfile, QSettings::IniFormat);
+    QSettings config(QString(configfile.c_str()), QSettings::IniFormat);
     config.setFallbacksEnabled(false);
 
     framerate_num = config.value("framerate_num").toUInt();
@@ -129,10 +127,9 @@ void MovieFileHeader::save(uint64_t tot_frames, uint64_t nb_frames)
     savestate_framecount = nb_frames;
     
     /* Save some parameters into the config file */
-    QString configfile = context->config.tempmoviedir.c_str();
-    configfile += "/config.ini";
+    std::filesystem::path configfile = context->config.tempmoviedir / "config.ini";
 
-    QSettings config(configfile, QSettings::IniFormat);
+    QSettings config(QString(configfile.c_str()), QSettings::IniFormat);
     config.setFallbacksEnabled(false);
 
     config.setValue("game_name", context->gamename.c_str());

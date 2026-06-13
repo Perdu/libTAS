@@ -1,5 +1,5 @@
 /*
-    Copyright 2015-2024 Clément Gallet <clement.gallet@ens-lyon.org>
+    Copyright 2015-2026 Clément Gallet <clement.gallet@ens-lyon.org>
 
     This file is part of libTAS.
 
@@ -23,6 +23,7 @@
 #include <QtWidgets/QDialog>
 #include <QtWidgets/QTabWidget>
 #include <QtWidgets/QMainWindow>
+#include <array>
 
 class Context;
 class RuntimePane;
@@ -47,7 +48,7 @@ public:
     enum TabIndex
     {
         RuntimeTab = 0,
-        MovieTab= 1,
+        MovieTab = 1,
         InputTab = 2,
         AudioTab = 3,
         VideoTab = 4,
@@ -56,27 +57,25 @@ public:
         PathTab = 7,
     };
 
-    void openRuntimeTab();
-    void openMovieTab();
-    void openInputTab();
-    void openAudioTab();
-    void openVideoTab();
-    void openDebugTab();
-    void openGameSpecificTab();
-    void openPathTab();
+    void openTab(TabIndex index);
 
     void loadConfig();
 
 private:
+    void ensureTab(TabIndex index);
+    QWidget *createTabWidget(TabIndex index);
+
     QTabWidget* tabWidget;
-    RuntimePane* rp;
-    MoviePane* mp;
-    InputPane* ip;
-    AudioPane* ap;
-    VideoPane* vp;
-    DebugPane* gp;
-    GameSpecificPane* gsp;
-    PathPane* pp;
+    RuntimePane* rp = nullptr;
+    MoviePane* mp = nullptr;
+    InputPane* ip = nullptr;
+    AudioPane* ap = nullptr;
+    VideoPane* vp = nullptr;
+    DebugPane* gp = nullptr;
+    GameSpecificPane* gsp = nullptr;
+    PathPane* pp = nullptr;
+    std::array<QWidget*, 8> tabPages{};
+    int currentStatus = 0;
 
 private slots:
     void save();

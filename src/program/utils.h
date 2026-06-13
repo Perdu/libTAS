@@ -1,5 +1,5 @@
 /*
-    Copyright 2015-2024 Clément Gallet <clement.gallet@ens-lyon.org>
+    Copyright 2015-2026 Clément Gallet <clement.gallet@ens-lyon.org>
 
     This file is part of libTAS.
 
@@ -21,22 +21,12 @@
 #define LIBTAS_UTILS_H_INCLUDED
 
 #include <string>
+#include <string_view>
 #include <cstdint>
+#include <filesystem>
 
 /* Forward declaration */
 struct Context;
-
-/* Get the file from path */
-std::string fileFromPath(const std::string& path);
-
-/* Get the directory from path */
-std::string dirFromPath(const std::string& path);
-
-/* Get the absolute path of a file even if it doesn't exist */
-std::string realpath_nonexist(const std::string& path);
-
-/* Create a directory if it does not exist already */
-int create_dir(const std::string& path);
 
 /* Remove savestate files */
 void remove_savestates(Context* context);
@@ -59,13 +49,13 @@ enum BinaryType {
 };
 
 /* Run the `file` command from a shell and extract the output of the command. */
-int extractBinaryType(std::string path);
+int extractBinaryType(std::filesystem::path path);
 
 /* Get the executable from MacOS .app directory. */
-std::string extractMacOSExecutable(std::string path);
+std::filesystem::path extractMacOSExecutable(std::filesystem::path path);
 
 /* Get the result of a shell command */
-std::string queryCmd(const std::string& cmd, int* status = nullptr);
+std::string queryCmd(std::string_view cmd, int* status = nullptr);
 
 /* Get the result of a shell command and returns pid */
 std::string queryCmdPid(const char **command, pid_t* popen_pid);

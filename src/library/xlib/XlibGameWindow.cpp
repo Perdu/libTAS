@@ -1,5 +1,5 @@
 /*
-    Copyright 2015-2024 Clément Gallet <clement.gallet@ens-lyon.org>
+    Copyright 2015-2026 Clément Gallet <clement.gallet@ens-lyon.org>
 
     This file is part of libTAS.
 
@@ -120,7 +120,9 @@ bool XlibGameWindow::isTopLevel(Display *display, Window w)
     Window *children_return = nullptr;
     unsigned int nchildren_return = 0;
     Window root_window;
-    XQueryTree(display, w, &root_window, &parent_return, &children_return, &nchildren_return);
+    if (!XQueryTree(display, w, &root_window, &parent_return, &children_return, &nchildren_return)) {
+        return false;
+    }
     if (children_return) XFree(children_return);
     
     return isRootWindow(display, parent_return);

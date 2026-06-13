@@ -1,5 +1,5 @@
 /*
-    Copyright 2015-2024 Clément Gallet <clement.gallet@ens-lyon.org>
+    Copyright 2015-2026 Clément Gallet <clement.gallet@ens-lyon.org>
 
     This file is part of libTAS.
 
@@ -78,10 +78,6 @@ void RuntimePane::initLayout()
     savestateBox->setLayout(savestateLayout);
 
     stateIncrementalBox = new ToolTipCheckBox(tr("Incremental savestates"));
-    if (!context->is_soft_dirty) {
-        stateIncrementalBox->setEnabled(false);
-        context->config.sc.savestate_settings &= ~SharedConfig::SS_INCREMENTAL;
-    }
     stateCompressedBox = new ToolTipCheckBox(tr("Compressed savestates"));
     stateUnmappedBox = new ToolTipCheckBox(tr("Skip unmapped pages"));
     stateForkBox = new ToolTipCheckBox(tr("Fork to save states"));

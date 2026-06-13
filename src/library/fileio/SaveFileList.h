@@ -1,5 +1,5 @@
 /*
-    Copyright 2015-2024 Clément Gallet <clement.gallet@ens-lyon.org>
+    Copyright 2015-2026 Clément Gallet <clement.gallet@ens-lyon.org>
 
     This file is part of libTAS.
 
@@ -64,6 +64,7 @@ int renameSaveFile(const char *oldfile, const char *newfile);
 
 /* Get the savefile object */
 const SaveFile* getSaveFile(const char *file);
+const SaveFile* getSaveFile(FILE* stream);
 const SaveFile* getSaveFile(int fd);
 
 /* Get the file descriptor of a savefile, or 0 if not a savefile */

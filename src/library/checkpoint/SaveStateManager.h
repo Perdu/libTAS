@@ -1,5 +1,5 @@
 /*
-    Copyright 2015-2024 Clément Gallet <clement.gallet@ens-lyon.org>
+    Copyright 2015-2026 Clément Gallet <clement.gallet@ens-lyon.org>
 
     This file is part of libTAS.
 
@@ -86,7 +86,7 @@ void saveThreadList();
 void createNewThreads();
 
 /* Function passed to clone() for new threads */
-int startNewThread(void *arg);
+__attribute__ ((visibility ("default"))) int startNewThread(void *arg);
 
 void waitForAllRestored(ThreadInfo *thread);
 

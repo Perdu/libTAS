@@ -1,5 +1,5 @@
 /*
-    Copyright 2015-2024 Clément Gallet <clement.gallet@ens-lyon.org>
+    Copyright 2015-2026 Clément Gallet <clement.gallet@ens-lyon.org>
 
     This file is part of libTAS.
 
@@ -23,6 +23,8 @@
 #include "logging.h"
 #include "global.h"
 #include "GlobalState.h"
+
+#include <cstdlib>
 
 namespace libtas {
 
@@ -199,7 +201,7 @@ void XIFreeDeviceInfo( XIDeviceInfo *info)
             switch (info[d].classes[c]->type) {
                 case XIButtonClass: {
                     XIButtonClassInfo* bc = reinterpret_cast<XIButtonClassInfo*>(info[d].classes[c]);
-                    delete bc->labels;
+                    delete[] bc->labels;
                     delete bc;
                     break;
                 }
@@ -210,15 +212,16 @@ void XIFreeDeviceInfo( XIDeviceInfo *info)
                 }
                 case XIKeyClass: {
                     XIKeyClassInfo* kc = reinterpret_cast<XIKeyClassInfo*>(info[d].classes[c]);
-                    delete kc->keycodes;
+                    delete[] kc->keycodes;
                     delete kc;
                     break;
                 }                
             }
         }
-        delete info[d].classes;
+        std::free(info[d].name);
+        delete[] info[d].classes;
     }
-    delete info;    
+    delete[] info;
 }
 
 int XIGrabTouchBegin(Display *display, int deviceid, Window grab_window, Bool owner_events, XIEventMask *mask, int num_modifiers, XIGrabModifiers *modifiers_inout)

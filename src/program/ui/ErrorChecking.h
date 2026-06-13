@@ -1,5 +1,5 @@
 /*
-    Copyright 2015-2024 Clément Gallet <clement.gallet@ens-lyon.org>
+    Copyright 2015-2026 Clément Gallet <clement.gallet@ens-lyon.org>
 
     This file is part of libTAS.
 
@@ -20,8 +20,9 @@
 #ifndef LIBTAS_ERRORCHECKING_H_INCLUDED
 #define LIBTAS_ERRORCHECKING_H_INCLUDED
 
-#include <QString>
+#include <QtCore/QString>
 #include <string>
+#include <filesystem>
 
 /* Forward declaration */
 struct Context;
@@ -34,15 +35,15 @@ namespace ErrorChecking {
     /* Check if the game path is an existing file, and that this file is
      * executable by the user.
      */
-    bool checkGameExists(std::string gamepath, bool interactive);
+    bool checkGameExists(std::filesystem::path gamepath, bool interactive);
 
     /* Check that the moviefile exists */
-    bool checkMovieExists(std::string moviepath, bool interactive);
+    bool checkMovieExists(std::filesystem::path moviepath, bool interactive);
 
     /* Check that the directory of the movie file exists, and that the
      * movie file can be written in its directory.
      */
-    bool checkMovieWriteable(std::string moviepath, bool interactive);
+    bool checkMovieWriteable(std::filesystem::path moviepath, bool interactive);
 
     /* Check if the libtas.so library and the game executable where compiled
      * for the same arch.

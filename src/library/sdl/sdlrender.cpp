@@ -1,5 +1,5 @@
 /*
-    Copyright 2015-2024 Clément Gallet <clement.gallet@ens-lyon.org>
+    Copyright 2015-2026 Clément Gallet <clement.gallet@ens-lyon.org>
 
     This file is part of libTAS.
 
@@ -96,7 +96,9 @@ int SDL_RenderSetLogicalSize(SDL_Renderer * renderer, int w, int h)
     /* Don't let the game have logical size that differs from screen size,
      * so we resize the window instead.
      */
-    SDL_SetWindowSize(sdl::gameSDLWindow, w, h);
+    if (sdl::gameSDLWindow) {
+        SDL_SetWindowSize(sdl::gameSDLWindow, w, h);
+    }
     logical_w = w;
     logical_h = h;
 
@@ -108,8 +110,12 @@ void SDL_RenderGetLogicalSize(SDL_Renderer * renderer, int *w, int *h)
     LOGTRACE(LCF_SDL | LCF_WINDOW);
 
     /* Set the stored values of logical size */
-    *w = logical_w;
-    *h = logical_h;
+    if (w) {
+        *w = logical_w;
+    }
+    if (h) {
+        *h = logical_h;
+    }
 }
 
 int SDL_RenderSetViewport(SDL_Renderer * renderer, const SDL_Rect * rect)

@@ -1,5 +1,5 @@
 /*
-    Copyright 2015-2024 Clément Gallet <clement.gallet@ens-lyon.org>
+    Copyright 2015-2026 Clément Gallet <clement.gallet@ens-lyon.org>
 
     This file is part of libTAS.
 
@@ -28,6 +28,7 @@ class QCheckBox;
 class QRadioButton;
 class QSpinBox;
 class ToolTipCheckBox;
+class ToolTipComboBox;
 class QGroupBox;
 
 class VideoPane : public QWidget {
@@ -61,7 +62,7 @@ private:
     QCheckBox* osdEncodeBox;
 
     ToolTipCheckBox* rendSoftBox;
-    ToolTipCheckBox* rendPerfBox;
+    ToolTipComboBox* rendQualityChoice;
 
 public slots:
     void loadConfig();

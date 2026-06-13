@@ -1,5 +1,5 @@
 /*
-    Copyright 2015-2024 Clément Gallet <clement.gallet@ens-lyon.org>
+    Copyright 2015-2026 Clément Gallet <clement.gallet@ens-lyon.org>
 
     This file is part of libTAS.
 
@@ -59,6 +59,7 @@ class SaveStateLoading
 
     private:
     char nextFlag();
+    bool validateCompressedLength() const;
 
     char flags[4096];
     char current_flag;

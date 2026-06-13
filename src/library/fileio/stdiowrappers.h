@@ -1,5 +1,5 @@
 /*
-    Copyright 2015-2024 Clément Gallet <clement.gallet@ens-lyon.org>
+    Copyright 2015-2026 Clément Gallet <clement.gallet@ens-lyon.org>
 
     This file is part of libTAS.
 
@@ -34,7 +34,7 @@ OVERRIDE FILE *fopen64 (const char *filename, const char *modes);
 OVERRIDE int fclose (FILE *stream);
 
 /* Return the system file descriptor for STREAM.  */
-// OVERRIDE int fileno (FILE *stream) __THROW;
+OVERRIDE int fileno (FILE *stream) __THROW;
 
 }
 

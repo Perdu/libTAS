@@ -1,5 +1,5 @@
 /*
-    Copyright 2015-2024 Clément Gallet <clement.gallet@ens-lyon.org>
+    Copyright 2015-2026 Clément Gallet <clement.gallet@ens-lyon.org>
 
     This file is part of libTAS.
 
@@ -22,6 +22,9 @@
 
 #include <string>
 #include <cstdio> // FILE
+#include <sys/stat.h>
+
+#define FIRST_SAVEFILE_STREAM_FD 257
 
 namespace libtas {
 
@@ -39,6 +42,8 @@ public:
 
     bool removed = false;
     bool closed = true;
+    
+    static int last_stream_fd;
 
     /* Remove duplicate /, /./ and /../ from a path */
     static char* canonicalizeFile(const char *file);
@@ -57,6 +62,12 @@ public:
 
     /* Remove a savefile and return 0 for success and -1 for error (+ errno set) */
     int remove();
+
+    /* Fills the stat struct */
+    int getStat(struct stat *buf) const;
+
+    /* Fills the stat64 struct */
+    int getStat64(struct stat64 *buf) const;
 
     /* Write the content of a savefile in its original path */
     bool saveOnDisk() const;

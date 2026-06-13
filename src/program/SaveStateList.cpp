@@ -1,5 +1,5 @@
 /*
-    Copyright 2015-2024 Clément Gallet <clement.gallet@ens-lyon.org>
+    Copyright 2015-2026 Clément Gallet <clement.gallet@ens-lyon.org>
 
     This file is part of libTAS.
 
@@ -153,11 +153,8 @@ int SaveStateList::stateAtFrame(uint64_t frame)
 
 uint64_t SaveStateList::rootStateFramecount()
 {
-    if (last_state_id == -1)
-        return 0;
-        
     int parent_id = last_state_id;
-    uint64_t framecount;
+    uint64_t framecount = 0;
     
     while (parent_id != -1) {
         framecount = states[parent_id].framecount;

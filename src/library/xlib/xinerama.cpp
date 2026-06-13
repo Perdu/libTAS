@@ -1,5 +1,5 @@
 /*
-    Copyright 2015-2024 Clément Gallet <clement.gallet@ens-lyon.org>
+    Copyright 2015-2026 Clément Gallet <clement.gallet@ens-lyon.org>
 
     This file is part of libTAS.
 
@@ -23,6 +23,8 @@
 #include "logging.h"
 #include "global.h"
 
+#include <X11/Xlibint.h>
+
 namespace libtas {
 
 XineramaScreenInfo *XineramaQueryScreens(Display *dpy, int *number)
@@ -31,7 +33,11 @@ XineramaScreenInfo *XineramaQueryScreens(Display *dpy, int *number)
 
     if (Global::shared_config.screen_width) {
         *number = 1;
-        XineramaScreenInfo *info = static_cast<XineramaScreenInfo*>(malloc(sizeof(XineramaScreenInfo)));
+        XineramaScreenInfo *info = static_cast<XineramaScreenInfo*>(Xmalloc(sizeof(XineramaScreenInfo)));
+        if (!info) {
+            *number = 0;
+            return nullptr;
+        }
         info->screen_number = 0;
         info->x_org = 0;
         info->y_org = 0;

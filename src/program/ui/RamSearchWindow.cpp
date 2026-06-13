@@ -1,5 +1,5 @@
 /*
-    Copyright 2015-2024 Clément Gallet <clement.gallet@ens-lyon.org>
+    Copyright 2015-2026 Clément Gallet <clement.gallet@ens-lyon.org>
 
     This file is part of libTAS.
 
@@ -460,7 +460,7 @@ void RamSearchWindow::slotAdd()
     int row = index.row();
 
     /* Fill the watch edit window with parameters from the selected watch */
-    ramWatchWindow->ramWatchView->editWindow->fill(ramSearchModel->address(row), typeBox->currentIndex());
+    ramWatchWindow->ramWatchView->ensureEditWindow()->fill(ramSearchModel->address(row), typeBox->currentIndex());
     ramWatchWindow->ramWatchView->slotAdd();
 }
 

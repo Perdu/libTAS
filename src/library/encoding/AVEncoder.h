@@ -1,5 +1,5 @@
 /*
-    Copyright 2015-2024 Clément Gallet <clement.gallet@ens-lyon.org>
+    Copyright 2015-2026 Clément Gallet <clement.gallet@ens-lyon.org>
 
     This file is part of libTAS.
 
@@ -65,7 +65,7 @@ class AVEncoder {
         static int segment_number;
     private:
         FILE *ffmpeg_pipe = nullptr;
-        pid_t ffmpeg_pid;
+        pid_t ffmpeg_pid = -1;
         NutMuxer* nutMuxer = nullptr;
 
         uint8_t* pixels = nullptr;

@@ -1,5 +1,5 @@
 /*
-    Copyright 2015-2024 Clément Gallet <clement.gallet@ens-lyon.org>
+    Copyright 2015-2026 Clément Gallet <clement.gallet@ens-lyon.org>
 
     This file is part of libTAS.
 
@@ -150,13 +150,12 @@ int ScreenCapture_SDL1::getPixelsFromSurface(uint8_t **pixels, bool draw)
         return -1;
     }
 
-    /* I know memcpy is not recommended for vectors... */
-    memcpy(winpixels.data(), screenSDL1Surf->pixels, size);
+    ret = copyPixelRows(screenSDL1Surf->pixels, screenSDL1Surf->pitch);
 
     /* Unlock surface */
     orig::SDL1_UnlockSurface(screenSDL1Surf);
 
-    return size;
+    return ret;
 }
 
 int ScreenCapture_SDL1::copySurfaceToScreen()

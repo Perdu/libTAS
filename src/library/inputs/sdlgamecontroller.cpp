@@ -1,5 +1,5 @@
 /*
-    Copyright 2015-2024 Clément Gallet <clement.gallet@ens-lyon.org>
+    Copyright 2015-2026 Clément Gallet <clement.gallet@ens-lyon.org>
 
     This file is part of libTAS.
 
@@ -132,12 +132,23 @@ void mySDL_GameControllerChangeAttached(int index)
     LOG(LL_TRACE, LCF_SDL | LCF_JOYSTICK, "%s call with id %d", __func__, joy);
     if (joy < 0 || joy >= Global::shared_config.nb_controllers)
         return NULL;
-    if (gcids[joy] != -1)
+    if (gcids[joy] == -1)
         return NULL;
     return reinterpret_cast<SDL_GameController*>(&gcids[joy]);
 }
 
 const char* xbox360Mapping = "00000000000000000000000000000000,XInput Controller,a:b0,b:b1,back:b6,dpdown:h0.4,dpleft:h0.8,dpright:h0.2,dpup:h0.1,guide:b8,leftshoulder:b4,leftstick:b9,lefttrigger:a2,leftx:a0,lefty:a1,rightshoulder:b5,rightstick:b10,righttrigger:a5,rightx:a3,righty:a4,start:b7,x:b2,y:b3,";
+
+static char* duplicateMapping()
+{
+    size_t mapsize = std::strlen(xbox360Mapping) + 1;
+    char* mapping = static_cast<char*>(std::malloc(mapsize));
+    if (mapping == nullptr)
+        return nullptr;
+
+    std::memcpy(mapping, xbox360Mapping, mapsize);
+    return mapping;
+}
 
 /* Override */ char *SDL_GameControllerMappingForGUID( SDL_JoystickGUID guid )
 {
@@ -147,10 +158,7 @@ const char* xbox360Mapping = "00000000000000000000000000000000,XInput Controller
      *
      * The game is supposed to free this, so we must allocate it.
      */
-    int mapsize = strlen(xbox360Mapping);
-    char* mapping = static_cast<char*>(malloc(mapsize+1));
-    strcpy(mapping, xbox360Mapping);
-    return mapping;
+    return duplicateMapping();
 }
 
 /* Override */ char *SDL_GameControllerMapping( SDL_GameController * gamecontroller )
@@ -172,10 +180,7 @@ const char* xbox360Mapping = "00000000000000000000000000000000,XInput Controller
     /* Return the mapping of my own xbox 360 controller.
      * The game is supposed to free the char*, so we must
      * allocate it. */
-    int mapsize = strlen(xbox360Mapping);
-    char* mapping = static_cast<char*>(malloc(mapsize+1));
-    strcpy(mapping, xbox360Mapping);
-    return mapping;
+    return duplicateMapping();
 }
 
 /* Override */ char *SDL_GameControllerMappingForDeviceIndex(int joystick_index)
@@ -188,10 +193,7 @@ const char* xbox360Mapping = "00000000000000000000000000000000,XInput Controller
     /* Return the mapping of my own xbox 360 controller.
      * The game is supposed to free the char*, so we must
      * allocate it. */
-    int mapsize = strlen(xbox360Mapping);
-    char* mapping = static_cast<char*>(malloc(mapsize+1));
-    strcpy(mapping, xbox360Mapping);
-    return mapping;
+    return duplicateMapping();
 }
 
 /* Override */ SDL_bool SDL_GameControllerGetAttached(SDL_GameController *gamecontroller)

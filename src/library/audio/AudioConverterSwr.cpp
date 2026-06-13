@@ -1,5 +1,5 @@
 /*
-    Copyright 2015-2024 Clément Gallet <clement.gallet@ens-lyon.org>
+    Copyright 2015-2026 Clément Gallet <clement.gallet@ens-lyon.org>
 
     This file is part of libTAS.
 
@@ -66,6 +66,7 @@ AudioConverterSwr::AudioConverterSwr(void)
     {
         GlobalNoLog gnl;
         LINK_NAMESPACE(swr_alloc, "swresample");
+        LINK_NAMESPACE_FULLNAME(swr_alloc, "libswresample.so.6");
         LINK_NAMESPACE_FULLNAME(swr_alloc, "libswresample.so.5");
         LINK_NAMESPACE_FULLNAME(swr_alloc, "libswresample.so.4");
         LINK_NAMESPACE_FULLNAME(swr_alloc, "libswresample.so.3");

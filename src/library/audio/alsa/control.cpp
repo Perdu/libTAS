@@ -1,5 +1,5 @@
 /*
-    Copyright 2015-2024 Clément Gallet <clement.gallet@ens-lyon.org>
+    Copyright 2015-2026 Clément Gallet <clement.gallet@ens-lyon.org>
 
     This file is part of libTAS.
 
@@ -24,6 +24,16 @@
 #include "global.h"
 
 namespace libtas {
+
+static char* duplicateHintString(const char* value, size_t size)
+{
+    char* str = static_cast<char*>(malloc(size));
+    if (str == nullptr)
+        return nullptr;
+
+    memcpy(str, value, size);
+    return str;
+}
 
 int snd_device_name_hint(int card, const char *iface, void ***hints)
 {
@@ -54,22 +64,19 @@ char *snd_device_name_get_hint(const void *hint, const char *id)
     static char device_desc[] = "libTAS dummy device description";
     static char device_io[] = "Output";
 
+    if (id == nullptr)
+        return nullptr;
+
     if (strcmp(id, "NAME") == 0) {
-        char* str = static_cast<char*>(malloc(sizeof(device_name)));
-        strcpy(str, device_name);
-        return str;
+        return duplicateHintString(device_name, sizeof(device_name));
     }
 
     if (strcmp(id, "DESC") == 0) {
-        char* str = static_cast<char*>(malloc(sizeof(device_desc)));
-        strcpy(str, device_desc);
-        return str;
+        return duplicateHintString(device_desc, sizeof(device_desc));
     }
 
     if (strcmp(id, "IOID") == 0) {
-        char* str = static_cast<char*>(malloc(sizeof(device_io)));
-        strcpy(str, device_io);
-        return str;
+        return duplicateHintString(device_io, sizeof(device_io));
     }
 
     return nullptr;

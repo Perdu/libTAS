@@ -1,5 +1,5 @@
 /*
-    Copyright 2015-2024 Clément Gallet <clement.gallet@ens-lyon.org>
+    Copyright 2015-2026 Clément Gallet <clement.gallet@ens-lyon.org>
 
     This file is part of libTAS.
 
@@ -219,6 +219,14 @@ EGLContext eglCreateContext (EGLDisplay dpy, EGLConfig config, EGLContext share_
 {
     LOGTRACE(LCF_OGL);
     LINK_NAMESPACE(eglCreateContext, "EGL");
+
+    if (!attrib_list) {
+        if (bindAPI == EGL_OPENGL_ES_API)
+            Global::game_info.opengl_profile = GameInfo::ES;
+
+        Global::game_info.tosend = true;
+        return orig::eglCreateContext(dpy, config, share_context, attrib_list);
+    }
 
     int i = 0;
     while (attrib_list[i] != 0) {

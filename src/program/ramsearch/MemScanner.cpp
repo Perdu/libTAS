@@ -1,5 +1,5 @@
 /*
-    Copyright 2015-2024 Clément Gallet <clement.gallet@ens-lyon.org>
+    Copyright 2015-2026 Clément Gallet <clement.gallet@ens-lyon.org>
 
     This file is part of libTAS.
 
@@ -28,21 +28,15 @@
 #include <iostream>
 #include <thread>
 
-std::string MemScanner::memscan_path;
-std::string MemScanner::addresses_path;
-std::string MemScanner::values_path;
+std::filesystem::path MemScanner::memscan_path;
+std::filesystem::path MemScanner::addresses_path;
+std::filesystem::path MemScanner::values_path;
 
-void MemScanner::init(std::string path)
+void MemScanner::init(std::filesystem::path path)
 {
     memscan_path = path;
-    
-    std::ostringstream ossov;
-    ossov << memscan_path << "/memory.bin";
-    values_path = ossov.str();
-
-    std::ostringstream ossoa;
-    ossoa << memscan_path << "/addresses.bin";
-    addresses_path = ossoa.str();
+    values_path = memscan_path / "memory.bin";
+    addresses_path = memscan_path / "addresses.bin";
 }
 
 int MemScanner::first_scan(int mem_flags, int type, int align, CompareType ct, CompareOperator co, MemValueType cv, MemValueType dv, uintptr_t begin_address, uintptr_t end_address)

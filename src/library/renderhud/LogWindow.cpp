@@ -1,5 +1,5 @@
 /*
-    Copyright 2015-2024 Clément Gallet <clement.gallet@ens-lyon.org>
+    Copyright 2015-2026 Clément Gallet <clement.gallet@ens-lyon.org>
 
     This file is part of libTAS.
 
@@ -43,8 +43,7 @@ void LogWindow::addLog(const char* beg, const char* end, bool newline)
     /* Logs can be added from multiple threads */
     std::lock_guard<std::mutex> lock(mutex);
     if (buffer.size() > 1000000) {
-        buffer.clear();
-        lineOffsets.clear();
+        clear();
     }
     buffer.append(beg, end);
     /* We always push a string with at most one `\n` character at the end */

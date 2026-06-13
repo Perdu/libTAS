@@ -1,5 +1,5 @@
 /*
-    Copyright 2015-2024 Clément Gallet <clement.gallet@ens-lyon.org>
+    Copyright 2015-2026 Clément Gallet <clement.gallet@ens-lyon.org>
 
     This file is part of libTAS.
 
@@ -29,7 +29,7 @@ struct Context;
 
 namespace AutoSave {
     void update(Context* context, MovieFile& movie);
-    void removeOldSaves(Context* context, const char* moviename);
+    void removeOldSaves(Context* context, const std::string& moviename);
 }
 
 #endif

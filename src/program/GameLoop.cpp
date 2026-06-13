@@ -1,5 +1,5 @@
 /*
-    Copyright 2015-2024 Clément Gallet <clement.gallet@ens-lyon.org>
+    Copyright 2015-2026 Clément Gallet <clement.gallet@ens-lyon.org>
 
     This file is part of libTAS.
 
@@ -61,6 +61,7 @@
 #include <sys/wait.h> // waitpid
 #include <stdint.h>
 #include <cstdlib>
+#include <filesystem>
 
 GameLoop::GameLoop(Context* c) : movie(MovieFile(c)), context(c)
 {
@@ -200,7 +201,7 @@ void GameLoop::init()
         encoding_segment = 0;
 
     /* Extract the game executable name from the game executable path */
-    context->gamename = fileFromPath(context->gamepath);
+    context->gamename = context->gamepath.filename();
 
     /* Clear the event queue and parameters */
     gameEvents->init();
@@ -382,24 +383,28 @@ void GameLoop::initProcessMessages()
         int index = 0;
         sendData(&index, sizeof(int));
 
-        std::string basesavestatepath = context->config.savestatedir + '/';
-        basesavestatepath += context->gamename;
+        std::filesystem::path basesavestatepath = context->config.savestatedir;
+        basesavestatepath /= context->gamename;
         basesavestatepath += ".state0";
         sendMessage(MSGN_BASE_SAVESTATE_PATH);
-        sendString(basesavestatepath);
+        sendString(basesavestatepath.string());
     }
 
     /* Send the Steam user data path and remote storage */
     if (context->config.sc.virtual_steam) {
         sendMessage(MSGN_STEAM_USER_DATA_PATH);
         sendString(context->config.steamuserdir);
-        std::string remotestorage = context->config.steamuserdir + "/";
-        remotestorage += context->gamename;
-        if (create_dir(remotestorage) < 0) {
+        std::filesystem::path remotestorage = context->config.steamuserdir;
+        remotestorage /= context->gamename;
+        try {
+            std::filesystem::create_directory(remotestorage);
+        }
+        catch (std::filesystem::filesystem_error const& ex) {
             std::cerr << "Cannot create dir " << remotestorage << std::endl;
+            std::cerr << "what():  " << ex.what() << std::endl;
         }
         sendMessage(MSGN_STEAM_REMOTE_STORAGE);
-        sendString(remotestorage);
+        sendString(remotestorage.string());
     }
 
     sendMessage(MSGN_ENCODING_SEGMENT);

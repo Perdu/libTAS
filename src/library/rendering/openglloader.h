@@ -1,5 +1,5 @@
 /*
-    Copyright 2015-2024 Clément Gallet <clement.gallet@ens-lyon.org>
+    Copyright 2015-2026 Clément Gallet <clement.gallet@ens-lyon.org>
 
     This file is part of libTAS.
 
@@ -78,6 +78,8 @@ struct GLProcs {
     DEFINE_GL_POINTER(BindTexture)
     DEFINE_GL_POINTER(BindSampler)
     DEFINE_GL_POINTER(TexImage2D)
+    DEFINE_GL_POINTER(CopyTexImage2D)
+    DEFINE_GL_POINTER(CopyTexSubImage2D)
     DEFINE_GL_POINTER(ActiveTexture)
     DEFINE_GL_POINTER(FramebufferTexture2D)
     DEFINE_GL_POINTER(UseProgram)

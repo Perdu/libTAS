@@ -1,5 +1,5 @@
 /*
-    Copyright 2015-2024 Clément Gallet <clement.gallet@ens-lyon.org>
+    Copyright 2015-2026 Clément Gallet <clement.gallet@ens-lyon.org>
 
     This file is part of libTAS.
 
@@ -47,6 +47,7 @@ static const luaL_Reg movie_functions[] =
     { "insertFrames", Lua::Movie::insertFrames},
     { "getMovieFileName", Lua::Movie::getMovieFileName},
     { "getInitialSystemTime", Lua::Movie::getInitialSystemTime},
+    { "getInitialElapsedTime", Lua::Movie::getInitialElapsedTime},
     { NULL, NULL }
 };
 
@@ -149,5 +150,12 @@ int Lua::Movie::getInitialSystemTime(lua_State *L)
 {
     lua_pushinteger(L, context->config.sc.initial_time_sec);
     lua_pushinteger(L, context->config.sc.initial_time_nsec);
+    return 2;
+}
+
+int Lua::Movie::getInitialElapsedTime(lua_State *L)
+{
+    lua_pushinteger(L, context->config.sc.initial_monotonic_time_sec);
+    lua_pushinteger(L, context->config.sc.initial_monotonic_time_nsec);
     return 2;
 }

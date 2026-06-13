@@ -1,5 +1,5 @@
 /*
-    Copyright 2015-2024 Clément Gallet <clement.gallet@ens-lyon.org>
+    Copyright 2015-2026 Clément Gallet <clement.gallet@ens-lyon.org>
 
     This file is part of libTAS.
 
@@ -28,6 +28,15 @@
 #include <stdint.h>
 
 namespace libtas {
+
+namespace {
+
+double timeHolderToNanos(const TimeHolder &time)
+{
+    return static_cast<double>(time.tv_sec) * 1000000000.0 + static_cast<double>(time.tv_nsec);
+}
+
+}
 
 /* Compute real and logical fps */
 void FPSMonitor::tickFrame(uint64_t framecount, float* fps, float* lfps)
@@ -82,8 +91,14 @@ void FPSMonitor::tickFrame(uint64_t framecount, float* fps, float* lfps)
         }
 
         if (can_output) {
-            *fps = static_cast<float>(deltaFrames) * 1000000000.0f / (deltaTime.tv_sec * 1000000000.0f + deltaTime.tv_nsec);
-            *lfps = static_cast<float>(deltaFrames) * 1000000000.0f / (deltaTicks.tv_sec * 1000000000.0f + deltaTicks.tv_nsec);
+            const double deltaTimeNs = timeHolderToNanos(deltaTime);
+            const double deltaTicksNs = timeHolderToNanos(deltaTicks);
+
+            if (deltaTimeNs <= 0.0 || deltaTicksNs <= 0.0)
+                return;
+
+            *fps = static_cast<float>(static_cast<double>(deltaFrames) * 1000000000.0 / deltaTimeNs);
+            *lfps = static_cast<float>(static_cast<double>(deltaFrames) * 1000000000.0 / deltaTicksNs);
 
             /* Update fps computing frequency if fast-forwarding */
             if (Global::shared_config.fastforward) {
@@ -119,7 +134,11 @@ float FPSMonitor::tickRedraw()
     /* Compute real fps (number of ticks per second) */
     TimeHolder deltaTime = currentTime - lastTime;
 
-    return static_cast<float>(history_length) * 1000000000.0f / (deltaTime.tv_sec * 1000000000.0f + deltaTime.tv_nsec);
+    const double deltaTimeNs = timeHolderToNanos(deltaTime);
+    if (deltaTimeNs <= 0.0)
+        return 0.0f;
+
+    return static_cast<float>(static_cast<double>(history_length) * 1000000000.0 / deltaTimeNs);
 }
 
 
