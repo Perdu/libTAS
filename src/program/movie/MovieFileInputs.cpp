@@ -116,7 +116,7 @@ void MovieFileInputs::save()
     for (int i = 0; i <= 10; i++) {
         SaveState& s = SaveStateList::get(i);
         if (s.framecount != 0 && s.movie && s.movie->inputs) {
-            std::string branch_input_file = context->config.tempmoviedir + "/inputs" + std::to_string(i);
+            std::string branch_input_file = context->config.tempmoviedir / "/inputs" / std::to_string(i);
             std::ofstream branch_stream(branch_input_file, std::ofstream::trunc);
             InputSerialization::writeInputs(branch_stream, s.movie->inputs->input_list);
             branch_stream.close();

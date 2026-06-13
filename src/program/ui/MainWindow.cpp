@@ -778,11 +778,6 @@ void MainWindow::slotUpdateSettingsWindow(int status)
     windowManager->updateSettingsWindow(status);
 }
 
-void MainWindow::showLuaConsoleWindow()
-{
-    windowManager->showLuaConsoleWindow();
-}
-
 void MainWindow::updateStatus(int status)
 {
     /* Update game status (active/inactive) */
